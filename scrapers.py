@@ -599,7 +599,7 @@ def generate_mock_sourcing_data(query: str, limit: int = 20) -> List[Dict]:
     variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Lite", "2025", "Gen 2"]
     
     products = []
-    count = random.randint(8, min(limit, 24))
+    count = random.randint(3, min(limit, 24))
     for i in range(count):
         cost = round(base_cost * random.uniform(0.4, 1.8), 2)
         variant = random.choice(variants)
