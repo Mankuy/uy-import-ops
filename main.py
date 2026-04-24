@@ -881,6 +881,8 @@ def list_products(
     strategy: Optional[str] = None,
     sort_by: Optional[str] = "opportunity",
     sort_order: Optional[str] = "desc",
+    min_cost: Optional[float] = None,
+    max_cost: Optional[float] = None,
     skip: int = 0,
     limit: int = 100,
 ):
@@ -907,6 +909,12 @@ def list_products(
             q = q.filter(Product.margin_premium_vs_comp >= min_margin)
         else:
             q = q.filter(Product.margin_cost_plus >= min_margin)
+    
+    # Filter by cost range (USD)
+    if min_cost is not None and min_cost > 0:
+        q = q.filter(Product.product_cost_usd >= min_cost)
+    if max_cost is not None and max_cost > 0:
+        q = q.filter(Product.product_cost_usd <= max_cost)
     
     # Sorting
     sort_col = {
@@ -1834,6 +1842,8 @@ async def get_trending_products(
     q: Optional[str] = None,
     sort_by: Optional[str] = "demand",
     sort_order: Optional[str] = "desc",
+    min_cost: Optional[float] = None,
+    max_cost: Optional[float] = None,
 ):
     """Get AI-curated trending products OR live AliExpress search.
     Pass ?q=auriculares to search AliExpress in real time.
@@ -1890,6 +1900,10 @@ async def get_trending_products(
     if category:
         products = [p for p in products if p.get("cat") == category]
     products = [p for p in products if p.get("demand", 0) >= min_demand]
+    if min_cost is not None:
+        products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
+    if max_cost is not None:
+        products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
     
     # Sort
     sort_key = {

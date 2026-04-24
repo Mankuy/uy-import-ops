@@ -564,14 +564,62 @@
 
         <!-- Trending Categories -->
         <div>
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-bold">Nichos Pre-Calibrados</h3>
-            <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
+            <h3 class="text-lg font-bold">Product Hunter</h3>
+            <div class="flex items-center gap-3 flex-wrap">
               <span id="hunter-page-info" class="text-xs text-slate-500 bg-slate-800 px-3 py-1 rounded-full">Cargando...</span>
               <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
                 <input type="checkbox" id="hunter-images-toggle" class="accent-brand-500" checked onchange="loadNiches(1)">
-                <span>Buscar imágenes reales</span>
+                <span>Imágenes reales</span>
               </label>
+            </div>
+          </div>
+          
+          <!-- Search & Filters -->
+          <div class="glass rounded-xl p-4 mb-4 border border-slate-700/50">
+            <div class="flex flex-wrap gap-3 items-end">
+              <div class="flex-1 min-w-[200px]">
+                <label class="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1 block">Buscar producto</label>
+                <div class="flex gap-2">
+                  <input type="text" id="hunter-search" placeholder="Ej: auriculares, smartwatch, funda..." 
+                    class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                    onkeydown="if(event.key==='Enter'){loadNiches(1);return false;}">
+                  <button onclick="loadNiches(1)" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">🔍 Buscar</button>
+                  <button onclick="clearHunterSearch()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg text-sm transition">✕</button>
+                </div>
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1 block">Ordenar por</label>
+                <select id="hunter-sort" onchange="loadNiches(1)" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                  <option value="demand:desc">🔥 Demanda (alta)</option>
+                  <option value="demand:asc">Demanda (baja)</option>
+                  <option value="price:asc">💰 Precio (barato)</option>
+                  <option value="price:desc">Precio (caro)</option>
+                  <option value="margin:desc">📈 Margen (alto)</option>
+                  <option value="margin:asc">Margen (bajo)</option>
+                  <option value="rating:desc">⭐ Rating (alto)</option>
+                  <option value="reviews:desc">💬 Reviews (más)</option>
+                  <option value="name:asc">A-Z</option>
+                  <option value="name:desc">Z-A</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-3 mt-3">
+              <div class="flex items-center gap-2">
+                <label class="text-[10px] text-slate-500 uppercase font-bold">Costo min $</label>
+                <input type="number" id="hunter-min-cost" placeholder="0" min="0" step="1"
+                  class="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                  onchange="loadNiches(1)">
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[10px] text-slate-500 uppercase font-bold">Costo max $</label>
+                <input type="number" id="hunter-max-cost" placeholder="∞" min="0" step="1"
+                  class="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+                  onchange="loadNiches(1)">
+              </div>
+              <div class="flex items-center gap-2 ml-auto">
+                <span id="hunter-source-badge" class="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-400 hidden"></span>
+              </div>
             </div>
           </div>
           
@@ -1399,7 +1447,7 @@
 </div>
 
 <script>
-const API = '/api';
+const API = 'https://uy-import-ops.onrender.com/api';
 let statusChart = null;
 let currentProducts = [];
 
@@ -1749,6 +1797,16 @@ window.hunterPage = 1;
 window.hunterLimit = 20;
 window.hunterNiches = [];
 
+function clearHunterSearch() {
+  const searchInput = document.getElementById('hunter-search');
+  if (searchInput) searchInput.value = '';
+  const minCost = document.getElementById('hunter-min-cost');
+  if (minCost) minCost.value = '';
+  const maxCost = document.getElementById('hunter-max-cost');
+  if (maxCost) maxCost.value = '';
+  loadNiches(1);
+}
+
 async function loadNiches(page = 1) {
   const grid = document.getElementById('niches-grid');
   const pagination = document.getElementById('hunter-pagination');
@@ -1757,6 +1815,17 @@ async function loadNiches(page = 1) {
   const prevBtn = document.getElementById('hunter-prev');
   const nextBtn = document.getElementById('hunter-next');
   const withImages = document.getElementById('hunter-images-toggle').checked;
+  const searchInput = document.getElementById('hunter-search');
+  const sortInput = document.getElementById('hunter-sort');
+  const minCostInput = document.getElementById('hunter-min-cost');
+  const maxCostInput = document.getElementById('hunter-max-cost');
+  const sourceBadge = document.getElementById('hunter-source-badge');
+  
+  const query = searchInput ? searchInput.value.trim() : '';
+  const sortVal = sortInput ? sortInput.value : 'demand:desc';
+  const [sortBy, sortOrder] = sortVal.split(':');
+  const minCost = minCostInput && minCostInput.value ? parseFloat(minCostInput.value) : '';
+  const maxCost = maxCostInput && maxCostInput.value ? parseFloat(maxCostInput.value) : '';
   
   window.hunterPage = page;
   
@@ -1764,20 +1833,31 @@ async function loadNiches(page = 1) {
   grid.innerHTML = `
     <div class="col-span-full flex flex-col items-center justify-center py-16">
       <div class="spinner mb-4"></div>
-      <p class="text-sm text-slate-400">${withImages ? 'Buscando imágenes reales de productos...' : 'Cargando nichos...'}</p>
+      <p class="text-sm text-slate-400">${query ? 'Buscando en AliExpress...' : (withImages ? 'Buscando imágenes reales de productos...' : 'Cargando nichos...')}</p>
       <p class="text-xs text-slate-500 mt-1">${withImages ? 'Esto puede tardar unos segundos' : ''}</p>
     </div>`;
   pagination.classList.add('hidden');
+  if (sourceBadge) sourceBadge.classList.add('hidden');
   
   try {
-    const url = API + '/hunter/trending?limit=' + window.hunterLimit + '&page=' + page + '&with_images=' + withImages;
+    let url = API + '/hunter/trending?limit=' + window.hunterLimit + '&page=' + page + '&with_images=' + withImages;
+    url += '&sort_by=' + encodeURIComponent(sortBy) + '&sort_order=' + encodeURIComponent(sortOrder);
+    if (query) url += '&q=' + encodeURIComponent(query);
+    if (minCost !== '' && !isNaN(minCost)) url += '&min_cost=' + minCost;
+    if (maxCost !== '' && !isNaN(maxCost)) url += '&max_cost=' + maxCost;
     const r = await fetch(url);
     const d = await r.json();
     
     window.hunterNiches = d.products || [];
     
+    // Show source badge
+    if (sourceBadge && d.source) {
+      sourceBadge.textContent = d.source === 'aliexpress-live' ? '🌐 AliExpress en vivo' : '📚 Nichos curados';
+      sourceBadge.classList.remove('hidden');
+    }
+    
     // Update pagination info
-    pageInfo.textContent = d.total_available + ' productos · ' + d.total_pages + ' páginas';
+    pageInfo.textContent = (d.total_available || 0) + ' productos' + (d.total_pages > 1 ? ' · ' + d.total_pages + ' páginas' : '');
     pageIndicator.textContent = 'Página ' + d.page + ' de ' + d.total_pages;
     prevBtn.disabled = d.page <= 1;
     nextBtn.disabled = d.page >= d.total_pages;
@@ -1793,13 +1873,28 @@ async function loadNiches(page = 1) {
     }
     
     grid.innerHTML = d.products.map((n, i) => {
-      const profitColor = n.profit_score >= 80 ? 'text-accent-400' : n.profit_score >= 60 ? 'text-gold-400' : 'text-slate-400';
-      const profitBg = n.profit_score >= 80 ? 'bg-accent-500/15 border-accent-500/30' : n.profit_score >= 60 ? 'bg-gold-500/15 border-gold-500/30' : 'bg-slate-500/15 border-slate-500/30';
-      const demandBadge = n.demand >= 85 ? 'bg-red-500/20 text-red-400' : n.demand >= 70 ? 'bg-accent-500/20 text-accent-400' : 'bg-slate-500/20 text-slate-400';
-      const grad = getCategoryGradient(n.cat);
-      const emoji = getCategoryEmoji(n.cat);
+      const isLive = n.source === 'aliexpress-live';
+      const profitScore = n.profit_score || (isLive ? 70 : 50);
+      const demand = n.demand || (isLive ? 75 : 50);
+      const profitColor = profitScore >= 80 ? 'text-accent-400' : profitScore >= 60 ? 'text-gold-400' : 'text-slate-400';
+      const profitBg = profitScore >= 80 ? 'bg-accent-500/15 border-accent-500/30' : profitScore >= 60 ? 'bg-gold-500/15 border-gold-500/30' : 'bg-slate-500/15 border-slate-500/30';
+      const demandBadge = demand >= 85 ? 'bg-red-500/20 text-red-400' : demand >= 70 ? 'bg-accent-500/20 text-accent-400' : 'bg-slate-500/20 text-slate-400';
+      const cat = n.cat || 'tecnologia';
+      const grad = getCategoryGradient(cat);
+      const emoji = getCategoryEmoji(cat);
       const realIndex = (page - 1) * window.hunterLimit + i;
       const hasRealImg = n.has_real_image && n.img;
+      const rating = n.est_rating || n.rating || 4.5;
+      const reviews = n.est_reviews || n.reviews || n.orders || 0;
+      const competition = n.competition_level || 'Media';
+      const season = n.season || 'Todo el año';
+      const marginPotential = n.margin_potential || (isLive ? '~70%' : '~50%');
+      const trend = n.trend || (isLive ? '📈 En tendencia' : '➡️ Estable');
+      const cost = n.cost_usd || n.cost || n.price_usd || 0;
+      const ship = n.ship_usd || n.ship || 3.5;
+      const ml = n.ml_avg || n.ml || (cost * 2.5);
+      const keywords = n.keywords || (isLive ? 'import,china,aliexpress' : 'producto');
+      const sourceUrl = n.source_url || n.url || `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(n.name)}`;
       
       return `
       <div class="product-card glass rounded-2xl overflow-hidden gradient-border flex flex-col" style="animation: slideUp 0.4s ease-out ${i * 0.05}s both;">
@@ -1810,15 +1905,15 @@ async function loadNiches(page = 1) {
           </div>
           <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/30 to-transparent"></div>
           <span class="absolute bottom-3 left-3 text-xs font-bold px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10">${n.cat.replace('_', ' ')}</span>
-          <span class="absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-lg ${demandBadge}">🔥 ${n.demand}/100</span>
-          <span class="absolute top-3 left-3 text-xs font-bold px-2.5 py-1 rounded-lg ${profitBg}">${n.trend}</span>
+          <span class="absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-lg ${demandBadge}">🔥 ${demand}/100</span>
+          <span class="absolute top-3 left-3 text-xs font-bold px-2.5 py-1 rounded-lg ${profitBg}">${trend}</span>
           ${hasRealImg ? '<span class="absolute bottom-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">📷 Real</span>' : ''}
         </div>
         <div class="p-5 flex-1 flex flex-col">
           <div class="flex items-start justify-between gap-2 mb-2">
             <h4 class="font-bold text-sm leading-tight">${n.name}</h4>
             <div class="text-right shrink-0">
-              <span class="text-lg font-black ${profitColor}">${n.profit_score}</span>
+              <span class="text-lg font-black ${profitColor}">${profitScore}</span>
               <p class="text-[10px] text-slate-500">score</p>
             </div>
           </div>
@@ -1826,25 +1921,25 @@ async function loadNiches(page = 1) {
           <p class="text-xs text-slate-400 mb-3 line-clamp-2">${n.desc}</p>
           
           <div class="flex flex-wrap gap-1.5 mb-3">
-            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Rating">⭐ ${n.est_rating}</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Reviews">💬 ${n.est_reviews}</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Competencia">📊 ${n.competition_level}</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Temporada">📅 ${n.season}</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Margen">📈 ${n.margin_potential}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Rating">⭐ ${rating}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Reviews">💬 ${reviews}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Competencia">📊 ${competition}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Temporada">📅 ${season}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Margen">📈 ${marginPotential}</span>
           </div>
           
           <div class="grid grid-cols-3 gap-2 mb-3 text-center">
             <div class="bg-slate-800/50 rounded-lg p-2">
               <p class="text-[10px] text-slate-500">Costo</p>
-              <p class="text-sm font-bold text-white">$${n.cost}</p>
+              <p class="text-sm font-bold text-white">$${cost}</p>
             </div>
             <div class="bg-slate-800/50 rounded-lg p-2">
               <p class="text-[10px] text-slate-500">Flete</p>
-              <p class="text-sm font-bold text-white">$${n.ship}</p>
+              <p class="text-sm font-bold text-white">$${ship}</p>
             </div>
             <div class="bg-slate-800/50 rounded-lg p-2">
               <p class="text-[10px] text-slate-500">ML ~</p>
-              <p class="text-sm font-bold text-brand-400">$${n.ml}</p>
+              <p class="text-sm font-bold text-brand-400">$${ml}</p>
             </div>
           </div>
           
@@ -1853,9 +1948,9 @@ async function loadNiches(page = 1) {
               ${(n.keywords || '').split(',').slice(0,3).map(k => `<span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 truncate">${k.trim()}</span>`).join('')}
             </div>
             <div class="flex gap-1.5 shrink-0">
-              <a href="${n.source_url}" target="_blank" title="Buscar en AliExpress" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1.5 rounded-lg font-semibold transition">🔍</a>
+              <a href="${sourceUrl}" target="_blank" title="Buscar en AliExpress" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1.5 rounded-lg font-semibold transition">🔍</a>
               <button onclick="saveNicheToProducts(${i})" class="text-xs bg-accent-600 hover:bg-accent-500 text-white px-3 py-1.5 rounded-lg font-bold transition shadow-lg shadow-accent-600/20">+ Guardar</button>
-              <button onclick="addNicheToCalc('${n.name.replace(/'/g, "\\'")}', ${n.cost}, ${n.ship}, ${n.ml})" class="text-xs bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 px-2 py-1.5 rounded-lg font-semibold transition" title="Calcular">💰</button>
+              <button onclick="addNicheToCalc('${n.name.replace(/'/g, "\\'")}', ${cost}, ${ship}, ${ml})" class="text-xs bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 px-2 py-1.5 rounded-lg font-semibold transition" title="Calcular">💰</button>
             </div>
           </div>
         </div>
