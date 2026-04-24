@@ -112,6 +112,11 @@ async def generate_image_with_cf(prompt: str, filename: str, width: int = 1024, 
     if os.path.exists(filepath):
         return f"/generated_designs/{filename}"
     
+    # Check if CF credentials are configured
+    if not _CF_ACCOUNT or not _CF_TOKEN:
+        print(f"[CF AI] Missing credentials, skipping")
+        return ""
+    
     payload = {
         "prompt": prompt,
         "num_steps": 20,
@@ -121,15 +126,47 @@ async def generate_image_with_cf(prompt: str, filename: str, width: int = 1024, 
         "Content-Type": "application/json",
     }
     try:
+        print(f"[CF AI] Generating image with prompt: {prompt[:60]}...")
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(_CF_URL, json=payload, headers=headers)
+            print(f"[CF AI] Response status: {resp.status_code}")
             if resp.status_code != 200:
+                print(f"[CF AI] Error response: {resp.text[:200]}")
                 return ""
             # Save PNG bytes
             with open(filepath, "wb") as f:
                 f.write(resp.content)
+            print(f"[CF AI] Image saved: {filepath} ({len(resp.content)} bytes)")
             return f"/generated_designs/{filename}"
-    except Exception:
+    except Exception as e:
+        print(f"[CF AI] Exception: {type(e).__name__}: {str(e)[:200]}")
+        return ""
+
+async def generate_image_with_pollinations(prompt: str, filename: str, width: int = 1024, height: int = 1024) -> str:
+    """Fallback image generation using Pollinations.ai (free, no key)."""
+    filepath = os.path.join(_DESIGNS_DIR, filename)
+    if os.path.exists(filepath):
+        return f"/generated_designs/{filename}"
+    
+    import urllib.parse
+    encoded = urllib.parse.quote(prompt[:300])
+    seed = hash(prompt) % 10000
+    image_url = f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}&seed={seed}&nologo=true"
+    
+    try:
+        print(f"[Pollinations] Fallback generation...")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(image_url, headers={"User-Agent": "Mozilla/5.0"}, follow_redirects=True)
+            if resp.status_code == 200 and len(resp.content) > 5000:
+                with open(filepath, "wb") as f:
+                    f.write(resp.content)
+                print(f"[Pollinations] Image saved: {filepath} ({len(resp.content)} bytes)")
+                return f"/generated_designs/{filename}"
+            else:
+                print(f"[Pollinations] Failed: status={resp.status_code}, size={len(resp.content)}")
+                return ""
+    except Exception as e:
+        print(f"[Pollinations] Exception: {type(e).__name__}: {str(e)[:200]}")
         return ""
 
 async def download_image(url: str, timeout: float = 10.0) -> bytes:
@@ -2939,9 +2976,14 @@ async def generate_campaign_image(
             "note": f"{design_type} with real product photo composed. Reloads instantly.",
         }
 
-    # Generate background
+    # Generate background (try CF first, then Pollinations fallback)
     bg_url = await generate_image_with_cf(bg_prompt, bg_filename, w, h)
     if not bg_url or not os.path.exists(bg_path):
+        print(f"[Design] CF failed, trying Pollinations fallback...")
+        bg_url = await generate_image_with_pollinations(bg_prompt, bg_filename, w, h)
+    
+    if not bg_url or not os.path.exists(bg_path):
+        print(f"[Design] All AI generation failed, falling back to real photo")
         return {
             "product_id": pid, "product_name": name,
             "style": style, "usage": usage, "design_type": design_type,
@@ -2957,8 +2999,8 @@ async def generate_campaign_image(
             "product_id": pid, "product_name": name,
             "style": style, "usage": usage, "design_type": design_type,
             "width": w, "height": h,
-            "image_url": f"http://localhost:8000/generated_designs/{final_filename}",
-            "source": "cloudflare-ai + real product (composed)",
+            "image_url": f"/generated_designs/{final_filename}",
+            "source": "ai + real product (composed)",
             "note": f"{design_type} with your real product photo. AI background + real product.",
         }
     
@@ -2967,8 +3009,8 @@ async def generate_campaign_image(
         "product_id": pid, "product_name": name,
         "style": style, "usage": usage, "design_type": design_type,
         "width": w, "height": h,
-        "image_url": f"http://localhost:8000/generated_designs/{bg_filename}",
-        "source": "cloudflare-ai (background only)",
+        "image_url": f"/generated_designs/{bg_filename}",
+        "source": "ai (background only)",
         "note": f"AI-generated {design_type} background. No real product photo found.",
     }
 
