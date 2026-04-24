@@ -23,7 +23,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.orm import declarative_base, sessionmaker
 import httpx
 
-from scrapers import ProductHunter, TRENDING_NICHES_DATA
+from scrapers import ProductHunter, TRENDING_NICHES_DATA, search_bing_shopping, search_bing_web_products, generate_mock_sourcing_data
 
 # ═══════════════════════════════════════════════════════════════
 # IMAGE CACHE — persists across requests and restarts
@@ -1844,99 +1844,198 @@ async def get_trending_products(
     sort_order: Optional[str] = "desc",
     min_cost: Optional[float] = None,
     max_cost: Optional[float] = None,
+    mode: Optional[str] = None,
 ):
-    """Get AI-curated trending products OR live AliExpress search.
-    Pass ?q=auriculares to search AliExpress in real time.
+    """Real Product Hunter — searches live sources.
+    Pass ?q=auriculares to search live (Bing Shopping -> AliExpress -> mock).
+    Pass ?mode=curated to see the pre-built niche list (69 products).
     sort_by: price | margin | cost | demand | opportunity | rating | reviews | name
     sort_order: asc | desc
+    min_cost / max_cost: filter by USD purchase price in China
     """
     
-    # Live search mode
+    # ┌────────────────────────────────────────────────────────────────┐
+    # LIVE SEARCH MODE — the real hunter
+    # └─────────────────────────────────────────────────────────────────┘
     if q and q.strip():
-        hunter = ProductHunter()
-        results = await hunter.search_aliexpress(q.strip(), limit)
+        query = q.strip()
+        all_results = []
+        sources_used = []
+        
+        # Step 1: Bing Shopping (HTTP-only, works on Render)
+        try:
+            bing_results = await search_bing_shopping(query, limit=limit)
+            if bing_results:
+                all_results.extend(bing_results)
+                sources_used.append("bing-shopping")
+                print(f"[Hunter] Bing Shopping: {len(bing_results)} results")
+        except Exception as e:
+            print(f"[Hunter] Bing Shopping failed: {e}")
+        
+        # Step 2: Bing Web fallback
+        if len(all_results) < 3:
+            try:
+                web_results = await search_bing_web_products(query, limit=limit)
+                if web_results:
+                    all_results.extend(web_results)
+                    sources_used.append("bing-web")
+                    print(f"[Hunter] Bing Web: {len(web_results)} results")
+            except Exception as e:
+                print(f"[Hunter] Bing Web failed: {e}")
+        
+        # Step 3: AliExpress (Playwright — may OOM on Render)
+        if len(all_results) < 3:
+            try:
+                hunter = ProductHunter()
+                ali_results = await hunter.search_aliexpress(query, limit)
+                if ali_results:
+                    for r in ali_results:
+                        all_results.append({
+                            "name": r.get("name", "Unknown"),
+                            "price_usd": r.get("price_usd", 0),
+                            "image_url": r.get("image_url", ""),
+                            "product_url": r.get("product_url", ""),
+                            "rating": r.get("rating", 0),
+                            "sold_count": r.get("sold_count", 0),
+                            "source": "aliexpress",
+                        })
+                    sources_used.append("aliexpress")
+                    print(f"[Hunter] AliExpress: {len(ali_results)} results")
+            except Exception as e:
+                print(f"[Hunter] AliExpress failed: {e}")
+        
+        # Step 4: Mock fallback (realistic, keyword-aware)
+        if len(all_results) < 3:
+            mock_results = generate_mock_sourcing_data(query, limit)
+            all_results.extend(mock_results)
+            sources_used.append("mock-fallback")
+            print(f"[Hunter] Mock fallback: {len(mock_results)} results")
+        
+        # Normalize to common format
         normalized = []
-        for r in results:
+        for r in all_results:
+            cost = r.get("price_usd", 0)
+            # Apply cost filters
+            if min_cost is not None and cost < min_cost:
+                continue
+            if max_cost is not None and cost > max_cost:
+                continue
+            
+            # Try to enrich with real product image
+            img = r.get("image_url", "")
+            if not img:
+                # Try Bing image cache
+                img = _image_cache.get(r.get("name", ""), "")
+            
             normalized.append({
-                "name": r.get("title", "Unknown"),
-                "cat": category or "tecnologia",
-                "demand": 75,
-                "cost_usd": r.get("price_usd", 10),
-                "ship_usd": 3.5,
-                "ml_avg": r.get("price_usd", 10) * 2.5,
-                "img": r.get("image", ""),
-                "desc": r.get("title", ""),
-                "source_url": r.get("url", ""),
-                "rating": r.get("rating", 4.5),
-                "reviews": r.get("orders", 0),
-                "store": r.get("store", ""),
-                "source": "aliexpress-live",
+                "name": r.get("name", "Unknown")[:150],
+                "cat": category or "general",
+                "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
+                "cost_usd": cost,
+                "ship_usd": round(cost * 0.15 + 2, 2),  # 15% of cost + base
+                "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,  # rough ML estimate
+                "img": img,
+                "desc": r.get("name", ""),
+                "source_url": r.get("product_url", ""),
+                "rating": r.get("rating", 4.2),
+                "reviews": r.get("sold_count", 0),
+                "store": r.get("store", r.get("source", "unknown")),
+                "source": r.get("source", "unknown"),
             })
-        # Sort live results
+        
+        # Sort
+        def _sort_margin(x):
+            c = x.get("cost_usd", 0)
+            m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
+            if c > 0:
+                return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
+            return x.get("demand", 0)
+        
+        def _sort_opp(x):
+            c = x.get("cost_usd", 0)
+            m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
+            if c > 0:
+                return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
+            return x.get("demand", 0)
+        
         sort_key = {
             "price": lambda x: x.get("cost_usd", 0),
-            "margin": lambda x: x.get("demand", 0),
+            "margin": _sort_margin,
             "cost": lambda x: x.get("cost_usd", 0),
             "demand": lambda x: x.get("demand", 0),
-            "opportunity": lambda x: x.get("demand", 0),
+            "opportunity": _sort_opp,
             "rating": lambda x: x.get("rating", 0),
             "reviews": lambda x: x.get("reviews", 0),
             "name": lambda x: x.get("name", "").lower(),
         }.get(sort_by, lambda x: x.get("demand", 0))
         normalized.sort(key=sort_key, reverse=(sort_order != "asc"))
+        
         return {
-            "products": normalized,
-            "count": len(normalized),
+            "products": normalized[:limit],
+            "count": len(normalized[:limit]),
             "total_available": len(normalized),
             "page": 1,
-            "total_pages": 1,
-            "with_images": False,
-            "query": q,
-            "source": "aliexpress-live",
+            "total_pages": max(1, (len(normalized) + limit - 1) // limit),
+            "with_images": with_images,
+            "query": query,
+            "sources": sources_used,
+            "source": "live",
         }
     
-    # Static curated mode
-    products = WINNING_NICHES.copy()
-    if category:
-        products = [p for p in products if p.get("cat") == category]
-    products = [p for p in products if p.get("demand", 0) >= min_demand]
-    if min_cost is not None:
-        products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
-    if max_cost is not None:
-        products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
+    # ┌────────────────────────────────────────────────────────────────┐
+    # CURATED MODE — only when explicitly requested
+    # └─────────────────────────────────────────────────────────────────┘
+    if mode == "curated":
+        products = WINNING_NICHES.copy()
+        if category:
+            products = [p for p in products if p.get("cat") == category]
+        products = [p for p in products if p.get("demand", 0) >= min_demand]
+        if min_cost is not None:
+            products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
+        if max_cost is not None:
+            products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
+        
+        sort_key = {
+            "price": lambda x: x.get("cost_usd", 0) + x.get("ship_usd", 0),
+            "margin": lambda x: x.get("profit_score", 0),
+            "cost": lambda x: x.get("cost_usd", 0),
+            "demand": lambda x: x.get("demand", 0),
+            "opportunity": lambda x: x.get("demand", 0) * 0.6 + x.get("profit_score", 0) * 0.4,
+            "rating": lambda x: x.get("est_rating", 0),
+            "reviews": lambda x: x.get("est_reviews", 0),
+            "name": lambda x: x.get("name", "").lower(),
+        }.get(sort_by, lambda x: x.get("demand", 0))
+        products.sort(key=sort_key, reverse=(sort_order != "asc"))
+        
+        total = len(products)
+        start = (page - 1) * limit
+        products = products[start:start + limit]
+        
+        if with_images and products:
+            products = await enrich_products_with_images(products, max_concurrent=5)
+        
+        return {
+            "products": products,
+            "count": len(products),
+            "total_available": total,
+            "page": page,
+            "total_pages": (total + limit - 1) // limit,
+            "with_images": with_images,
+            "source": "curated",
+        }
     
-    # Sort
-    sort_key = {
-        "price": lambda x: x.get("cost_usd", 0) + x.get("ship_usd", 0),
-        "margin": lambda x: x.get("profit_score", 0),
-        "cost": lambda x: x.get("cost_usd", 0),
-        "demand": lambda x: x.get("demand", 0),
-        "opportunity": lambda x: x.get("demand", 0) * 0.6 + x.get("profit_score", 0) * 0.4,
-        "rating": lambda x: x.get("est_rating", 0),
-        "reviews": lambda x: x.get("est_reviews", 0),
-        "name": lambda x: x.get("name", "").lower(),
-    }.get(sort_by, lambda x: x.get("demand", 0))
-    products.sort(key=sort_key, reverse=(sort_order != "asc"))
-    
-    total = len(products)
-    
-    # Pagination
-    start = (page - 1) * limit
-    end = start + limit
-    products = products[start:end]
-    
-    # Fetch real images if requested (batch, parallel, cached)
-    if with_images and products:
-        products = await enrich_products_with_images(products, max_concurrent=5)
-    
+    # ┌────────────────────────────────────────────────────────────────┐
+    # EMPTY STATE — prompt user to search
+    # └─────────────────────────────────────────────────────────────────┘
     return {
-        "products": products,
-        "count": len(products),
-        "total_available": total,
-        "page": page,
-        "total_pages": (total + limit - 1) // limit,
-        "with_images": with_images,
-        "source": "curated",
+        "products": [],
+        "count": 0,
+        "total_available": 0,
+        "page": 1,
+        "total_pages": 0,
+        "with_images": False,
+        "source": "empty",
+        "message": "Ingresá un producto para buscar (ej: auriculares, smartwatch, lámpara). Usá ?mode=curated para ver los 69 nichos pre-cargados.",
     }
 
 @app.get("/api/hunter/categories")

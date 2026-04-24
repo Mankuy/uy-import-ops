@@ -441,6 +441,188 @@ class AIProductHunter:
 # UNIFIED INTERFACE
 # ═══════════════════════════════════════════════════════════════
 
+
+
+# ═══════════════════════════════════════════════════════════════
+# BING SHOPPING SCRAPER — HTTP-only, no Playwright needed
+# ═══════════════════════════════════════════════════════════════
+
+async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
+    """Search Bing Shopping for real products. Lightweight HTTP-only."""
+    search_url = f"https://www.bing.com/shop?q={query.replace(' ', '+')}&form=SHOPSB"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+    }
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(search_url, headers=headers)
+            if resp.status_code != 200:
+                return []
+            
+            html = resp.text
+            products = []
+            
+            # Bing Shopping uses structured data in script tags
+            # Try to find product cards
+            # Pattern 1: brqItem data
+            item_pattern = re.compile(r'"title":"([^"]{5,200})","url":"([^"]+)","image":"([^"]+)".*?"price":"?([0-9.,]+)"?')
+            for m in item_pattern.finditer(html):
+                title = m.group(1).replace('\u0026', '&').replace('\u0027', "'")
+                url = m.group(2).replace('\u0026', '&').replace('\/', '/')
+                img = m.group(3).replace('\u0026', '&').replace('\/', '/')
+                price_str = m.group(4).replace(',', '')
+                try:
+                    price = float(price_str)
+                    if price > 500:  # Likely local currency, convert roughly
+                        price = price / 42  # Assume UYU, convert to USD roughly
+                except:
+                    price = 0
+                
+                if title and len(title) > 5:
+                    products.append({
+                        "name": title[:150],
+                        "price_usd": round(price, 2) if price > 0 else 0,
+                        "image_url": img if img.startswith('http') else '',
+                        "product_url": url if url.startswith('http') else f"https://www.bing.com{url}",
+                        "source": "bing-shopping",
+                        "rating": 0,
+                        "sold_count": 0,
+                    })
+            
+            # Pattern 2: broader extraction from product card divs
+            if len(products) < 3:
+                # Extract from murl-style image references + titles nearby
+                titles = re.findall(r'class="[^"]*(?:title|prod)[^"]*"[^>]*>([^<]{10,200})</', html)
+                prices = re.findall(r'["']?(?:price|cost)["']?\s*[:=]\s*["']?([0-9]+[.,]?[0-9]*)["']?', html, re.I)
+                imgs = re.findall(r'"?(https?://[^"\s]+\.(?:jpg|jpeg|png|webp))"?', html)
+                
+                for i, title in enumerate(titles[:limit]):
+                    title_clean = re.sub(r'<[^>]+>', '', title).strip()
+                    p = float(prices[i].replace(',', '')) if i < len(prices) else 0
+                    if p > 500:
+                        p = p / 42
+                    img = imgs[i] if i < len(imgs) else ""
+                    products.append({
+                        "name": title_clean[:150],
+                        "price_usd": round(p, 2) if p > 0 else 0,
+                        "image_url": img,
+                        "product_url": f"https://www.bing.com/shop?q={query.replace(' ', '+')}",
+                        "source": "bing-shopping-fallback",
+                        "rating": 0,
+                        "sold_count": 0,
+                    })
+            
+            return products[:limit]
+    except Exception as e:
+        print(f"[Bing Shopping] Error: {e}")
+        return []
+
+async def search_bing_web_products(query: str, limit: int = 20) -> List[Dict]:
+    """Fallback: Bing Web search with product-oriented extraction."""
+    search_url = f"https://www.bing.com/search?q={query.replace(' ', '+')}+buy+price"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "es-ES,es;q=0.9",
+    }
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
+            resp = await client.get(search_url, headers=headers)
+            if resp.status_code != 200:
+                return []
+            
+            html = resp.text
+            products = []
+            
+            # Bing shows product cards with prices in search results
+            # Extract titles from h2 tags in result cards
+            results = re.findall(r'<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>([^<]{10,200})</a></h2>', html)
+            prices = re.findall(r'\$([0-9]+[.,]?[0-9]*)', html)
+            imgs = re.findall(r'"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
+            
+            for i, (url, title) in enumerate(results[:limit]):
+                title_clean = re.sub(r'<[^>]+>', '', title).strip()
+                p = 0
+                if i < len(prices):
+                    try:
+                        p = float(prices[i].replace(',', ''))
+                        if p > 500:
+                            p = p / 42
+                    except:
+                        pass
+                img = imgs[i] if i < len(imgs) else ""
+                products.append({
+                    "name": title_clean[:150],
+                    "price_usd": round(p, 2) if p > 0 else 0,
+                    "image_url": img,
+                    "product_url": url if url.startswith('http') else f"https://www.bing.com{url}",
+                    "source": "bing-web",
+                    "rating": 0,
+                    "sold_count": 0,
+                })
+            
+            return products[:limit]
+    except Exception as e:
+        print(f"[Bing Web] Error: {e}")
+        return []
+
+def generate_mock_sourcing_data(query: str, limit: int = 20) -> List[Dict]:
+    """Generate realistic mock sourcing data when all scrapers fail."""
+    import random
+    seed = hash(query.lower().strip()) % 10000
+    random.seed(seed)
+    
+    # Base price by keyword
+    base_cost = 15
+    q = query.lower()
+    if any(k in q for k in ["proyector", "drone", "monitor", "robot", "laptop", "tablet", "cámara"]):
+        base_cost = 80
+    elif any(k in q for k in ["smartwatch", "teclado", "auricular", "mouse", "cargador", "hub", "adaptador"]):
+        base_cost = 25
+    elif any(k in q for k in ["lámpara", "soporte", "organizador", "funda", "cable", "estuche", "bolso"]):
+        base_cost = 8
+    elif any(k in q for k in ["masaje", "fitness", "yoga", "deporte", "gym", "bicicleta"]):
+        base_cost = 35
+    elif any(k in q for k in ["cocina", "freidora", "olla", "cafetera", "licuadora", "batidora"]):
+        base_cost = 45
+    elif any(k in q for k in ["herramienta", "taladro", "atornillador", "sierra", "medidor"]):
+        base_cost = 30
+    elif any(k in q for k in ["mascota", "perro", "gato", "pecera", "comedero", "juguete"]):
+        base_cost = 12
+    
+    sellers = ["ShenzhenTech", "GuangzhouBest", "YiwuDirect", "HangzhouSmart", "SuzhouQuality", "NingboTrade", "ShenzhenPro"]
+    variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Lite", "2025", "Gen 2"]
+    
+    products = []
+    count = random.randint(8, min(limit, 24))
+    for i in range(count):
+        cost = round(base_cost * random.uniform(0.4, 1.8), 2)
+        variant = random.choice(variants)
+        seller = sellers[i % len(sellers)]
+        rating = round(random.uniform(3.8, 4.9), 1)
+        orders = random.randint(50, 5000)
+        
+        products.append({
+            "name": f"{query.title()} {variant} — {seller}",
+            "price_usd": cost,
+            "image_url": "",
+            "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
+            "product_id": f"MOCK_{seed}_{i}",
+            "rating": rating,
+            "sold_count": orders,
+            "source": "mock-fallback",
+            "store": seller,
+        })
+    
+    # Sort by a proxy of quality (rating * orders / price)
+    products.sort(key=lambda x: (x["rating"] * x["sold_count"]) / max(x["price_usd"], 1), reverse=True)
+    return products
+
 class ProductHunter:
     def __init__(self):
         self.ali = AliExpressScraper()
