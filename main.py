@@ -94,6 +94,43 @@ async def find_product_image_bing(name: str, timeout: float = 8.0) -> str:
     return ""
 
 # ═══════════════════════════════════════════════════════════════
+
+
+def find_product_image_bing_sync(name: str, timeout: float = 8.0) -> str:
+    """Synchronous version of Bing image search. Returns best image URL or empty string."""
+    if name in _image_cache:
+        return _image_cache[name]
+    query = f"{name} producto"
+    search_url = f"https://www.bing.com/images/search?q={query.replace(' ', '+')}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "es-ES,es;q=0.9",
+    }
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(search_url, headers=headers, follow_redirects=True)
+            if resp.status_code != 200:
+                _image_cache[name] = ""
+                return ""
+            murls = re.findall(r'&quot;murl&quot;:&quot;(https?://[^&]+)&quot;', resp.text)
+            for url in murls:
+                url_clean = url.replace("\\", "")
+                if any(bad in url_clean.lower() for bad in ['icon', 'logo', 'favicon', 'sprite', 'button', 'badge']):
+                    continue
+                if url_clean.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                    _image_cache[name] = url_clean
+                    _save_image_cache()
+                    return url_clean
+            if murls:
+                first = murls[0].replace("\\", "")
+                _image_cache[name] = first
+                _save_image_cache()
+                return first
+    except Exception:
+        pass
+    _image_cache[name] = ""
+    return ""
 # CLOUDFLARE WORKERS AI — free image generation
 # ═══════════════════════════════════════════════════════════════
 _CF_ACCOUNT = os.environ.get("CF_ACCOUNT_ID", "")
@@ -610,11 +647,16 @@ def run_product_hunter(db, niches=None):
         # Opportunity score: weighted by margin + demand
         opp = min(100, int(best_margin * 0.6 + niche["demand"] * 0.4))
         
+        # Try to find a real product image
+        real_img = find_product_image_bing_sync(niche["name"])
+        if not real_img:
+            real_img = niche.get("img", "")
+        
         p = Product(
             name=niche["name"],
             description=niche.get("desc", ""),
             category=niche["cat"],
-            image_url=niche.get("img", ""),
+            image_url=real_img,
             product_cost_usd=niche["cost_usd"],
             shipping_cost_usd=niche["ship_usd"],
             tariff_rate=tariff,
@@ -877,6 +919,44 @@ def list_products(status: Optional[str] = None, min_margin: Optional[float] = No
              "ml_competitor_price": p.ml_competitor_price,
              "created_at": p.created_at.isoformat() if p.created_at else None}
             for p in prods]
+
+
+
+@app.post("/api/products/refresh-images")
+async def refresh_product_images():
+    """Refresh all product images with real photos from Bing Images."""
+    db = SessionLocal()
+    products = db.query(Product).all()
+    updated = 0
+    failed = 0
+    skipped = 0
+    
+    for p in products:
+        # Skip if already has a real image (not unsplash generic)
+        if p.image_url and "unsplash" not in p.image_url and p.image_url.startswith("http"):
+            skipped += 1
+            continue
+        
+        # Try Bing search
+        try:
+            img = await find_product_image_bing(p.name)
+            if img:
+                p.image_url = img
+                updated += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+    
+    db.commit()
+    db.close()
+    return {
+        "total": len(products),
+        "updated": updated,
+        "skipped": skipped,
+        "failed": failed,
+        "message": f"Images refreshed. {updated} updated, {skipped} skipped (already had real images), {failed} failed."
+    }
 
 @app.get("/api/products/{pid}")
 def get_product(pid: int):
