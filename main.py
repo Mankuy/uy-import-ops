@@ -875,7 +875,19 @@ def create_product(p: ProductCreate):
     return {"id": prod.id, "message": "Created", "best_strategy": best_strat, "best_margin": best_margin}
 
 @app.get("/api/products")
-def list_products(status: Optional[str] = None, min_margin: Optional[float] = None, strategy: Optional[str] = None, skip: int = 0, limit: int = 100):
+def list_products(
+    status: Optional[str] = None,
+    min_margin: Optional[float] = None,
+    strategy: Optional[str] = None,
+    sort_by: Optional[str] = "opportunity",
+    sort_order: Optional[str] = "desc",
+    skip: int = 0,
+    limit: int = 100,
+):
+    """List products with filtering and sorting.
+    sort_by: price | margin | cost | demand | opportunity | rating | created | name
+    sort_order: asc | desc
+    """
     db = SessionLocal()
     q = db.query(Product)
     if status:
@@ -896,7 +908,24 @@ def list_products(status: Optional[str] = None, min_margin: Optional[float] = No
         else:
             q = q.filter(Product.margin_cost_plus >= min_margin)
     
-    prods = q.order_by(Product.opportunity_score.desc()).offset(skip).limit(limit).all()
+    # Sorting
+    sort_col = {
+        "price": Product.total_landed_cost_uyu,
+        "margin": Product.best_margin,
+        "cost": Product.product_cost_usd,
+        "demand": Product.demand_score,
+        "opportunity": Product.opportunity_score,
+        "rating": Product.demand_score,  # proxy
+        "created": Product.created_at,
+        "name": Product.name,
+    }.get(sort_by, Product.opportunity_score)
+    
+    if sort_order and sort_order.lower() == "asc":
+        q = q.order_by(sort_col.asc())
+    else:
+        q = q.order_by(sort_col.desc())
+    
+    prods = q.offset(skip).limit(limit).all()
     db.close()
     return [{"id": p.id, "name": p.name, "description": p.description, "category": p.category,
              "product_cost_usd": p.product_cost_usd,
@@ -1803,16 +1832,19 @@ async def get_trending_products(
     page: int = 1,
     with_images: bool = False,
     q: Optional[str] = None,
+    sort_by: Optional[str] = "demand",
+    sort_order: Optional[str] = "desc",
 ):
     """Get AI-curated trending products OR live AliExpress search.
     Pass ?q=auriculares to search AliExpress in real time.
-    Set with_images=true to fetch real product photos via Bing."""
+    sort_by: price | margin | cost | demand | opportunity | rating | reviews | name
+    sort_order: asc | desc
+    """
     
     # Live search mode
     if q and q.strip():
         hunter = ProductHunter()
         results = await hunter.search_aliexpress(q.strip(), limit)
-        # Normalize AliExpress results to match trending format
         normalized = []
         for r in results:
             normalized.append({
@@ -1830,6 +1862,18 @@ async def get_trending_products(
                 "store": r.get("store", ""),
                 "source": "aliexpress-live",
             })
+        # Sort live results
+        sort_key = {
+            "price": lambda x: x.get("cost_usd", 0),
+            "margin": lambda x: x.get("demand", 0),
+            "cost": lambda x: x.get("cost_usd", 0),
+            "demand": lambda x: x.get("demand", 0),
+            "opportunity": lambda x: x.get("demand", 0),
+            "rating": lambda x: x.get("rating", 0),
+            "reviews": lambda x: x.get("reviews", 0),
+            "name": lambda x: x.get("name", "").lower(),
+        }.get(sort_by, lambda x: x.get("demand", 0))
+        normalized.sort(key=sort_key, reverse=(sort_order != "asc"))
         return {
             "products": normalized,
             "count": len(normalized),
@@ -1846,7 +1890,19 @@ async def get_trending_products(
     if category:
         products = [p for p in products if p.get("cat") == category]
     products = [p for p in products if p.get("demand", 0) >= min_demand]
-    products.sort(key=lambda x: x.get("demand", 0), reverse=True)
+    
+    # Sort
+    sort_key = {
+        "price": lambda x: x.get("cost_usd", 0) + x.get("ship_usd", 0),
+        "margin": lambda x: x.get("profit_score", 0),
+        "cost": lambda x: x.get("cost_usd", 0),
+        "demand": lambda x: x.get("demand", 0),
+        "opportunity": lambda x: x.get("demand", 0) * 0.6 + x.get("profit_score", 0) * 0.4,
+        "rating": lambda x: x.get("est_rating", 0),
+        "reviews": lambda x: x.get("est_reviews", 0),
+        "name": lambda x: x.get("name", "").lower(),
+    }.get(sort_by, lambda x: x.get("demand", 0))
+    products.sort(key=sort_key, reverse=(sort_order != "asc"))
     
     total = len(products)
     
