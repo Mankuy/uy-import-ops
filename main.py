@@ -799,10 +799,10 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     count = db.query(Product).count()
     # Auto-seeding disabled — user adds products manually
-    # Auto-seeding disabled - user controls products
     # if count == 0:
     #     added = run_product_hunter(db)
     #     print(f"Product Hunter auto-init: added {added} products")
+    db.close()
     yield
 
 app = FastAPI(title="UY Import Ops Research v3", lifespan=lifespan)
@@ -1846,71 +1846,104 @@ async def get_trending_products(
     max_cost: Optional[float] = None,
     mode: Optional[str] = None,
 ):
-    """Real Product Hunter - searches live or shows curated list.
-    Pass ?q=auriculares to search with realistic sourcing data.
-    Pass ?mode=curated to see the pre-built 69 niche list.
+    """Real Product Hunter — searches live sources.
+    Pass ?q=auriculares to search live (Bing Shopping -> AliExpress -> mock).
+    Pass ?mode=curated to see the pre-built niche list (69 products).
     sort_by: price | margin | cost | demand | opportunity | rating | reviews | name
     sort_order: asc | desc
     min_cost / max_cost: filter by USD purchase price in China
     """
     
-    # LIVE SEARCH MODE
+    # ┌────────────────────────────────────────────────────────────────┐
+    # LIVE SEARCH MODE — the real hunter
+    # └─────────────────────────────────────────────────────────────────┘
     if q and q.strip():
-        query = q.strip().lower()
-        import random
-        seed = hash(query) % 10000
-        random.seed(seed)
+        query = q.strip()
+        all_results = []
+        sources_used = []
         
-        base_cost = 15
-        if any(k in query for k in ["proyector", "drone", "monitor", "robot", "laptop", "tablet", "camara", "cámara"]):
-            base_cost = 80
-        elif any(k in query for k in ["smartwatch", "teclado", "auricular", "auriculares", "mouse", "cargador", "hub"]):
-            base_cost = 25
-        elif any(k in query for k in ["lampara", "lámpara", "soporte", "organizador", "funda", "cable"]):
-            base_cost = 8
-        elif any(k in query for k in ["masaje", "fitness", "yoga", "deporte", "gym", "bicicleta"]):
-            base_cost = 35
-        elif any(k in query for k in ["cocina", "freidora", "olla", "cafetera", "licuadora"]):
-            base_cost = 45
-        elif any(k in query for k in ["herramienta", "taladro", "atornillador", "sierra"]):
-            base_cost = 30
+        # Step 1: Bing Shopping (HTTP-only, works on Render)
+        try:
+            bing_results = await search_bing_shopping(query, limit=limit)
+            if bing_results:
+                all_results.extend(bing_results)
+                sources_used.append("bing-shopping")
+                print(f"[Hunter] Bing Shopping: {len(bing_results)} results")
+        except Exception as e:
+            print(f"[Hunter] Bing Shopping failed: {e}")
         
-        sellers = ["ShenzhenTech", "GuangzhouBest", "YiwuDirect", "HangzhouSmart", "SuzhouQuality", "NingboTrade"]
-        variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Gen 2"]
+        # Step 2: Bing Web fallback
+        if len(all_results) < 3:
+            try:
+                web_results = await search_bing_web_products(query, limit=limit)
+                if web_results:
+                    all_results.extend(web_results)
+                    sources_used.append("bing-web")
+                    print(f"[Hunter] Bing Web: {len(web_results)} results")
+            except Exception as e:
+                print(f"[Hunter] Bing Web failed: {e}")
         
-        products = []
-        count = random.randint(3, max(3, min(limit, 20)))
-        for i in range(count):
-            cost = round(base_cost * random.uniform(0.4, 1.8), 2)
+        # Step 3: AliExpress (Playwright — may OOM on Render)
+        if len(all_results) < 3:
+            try:
+                hunter = ProductHunter()
+                ali_results = await hunter.search_aliexpress(query, limit)
+                if ali_results:
+                    for r in ali_results:
+                        all_results.append({
+                            "name": r.get("name", "Unknown"),
+                            "price_usd": r.get("price_usd", 0),
+                            "image_url": r.get("image_url", ""),
+                            "product_url": r.get("product_url", ""),
+                            "rating": r.get("rating", 0),
+                            "sold_count": r.get("sold_count", 0),
+                            "source": "aliexpress",
+                        })
+                    sources_used.append("aliexpress")
+                    print(f"[Hunter] AliExpress: {len(ali_results)} results")
+            except Exception as e:
+                print(f"[Hunter] AliExpress failed: {e}")
+        
+        # Step 4: Mock fallback (realistic, keyword-aware)
+        if len(all_results) < 3:
+            mock_results = generate_mock_sourcing_data(query, limit)
+            all_results.extend(mock_results)
+            sources_used.append("mock-fallback")
+            print(f"[Hunter] Mock fallback: {len(mock_results)} results")
+        
+        # Normalize to common format
+        normalized = []
+        for r in all_results:
+            cost = r.get("price_usd", 0)
+            # Apply cost filters
             if min_cost is not None and cost < min_cost:
                 continue
             if max_cost is not None and cost > max_cost:
                 continue
             
-            variant = random.choice(variants)
-            seller = sellers[i % len(sellers)]
-            rating = round(random.uniform(3.8, 4.9), 1)
-            orders = random.randint(50, 5000)
-            ship = round(cost * 0.15 + 2, 2)
-            ml_est = round(cost * 3 * 42, 0)
-            demand = min(95, max(50, int(70 + orders / 100)))
+            # Try to enrich with real product image
+            img = r.get("image_url", "")
+            if not img:
+                # Try Bing image cache
+                img = _image_cache.get(r.get("name", ""), "")
             
-            products.append({
-                "name": f"{q.strip().title()} {variant} — {seller}",
+            normalized.append({
+                "name": r.get("name", "Unknown")[:150],
                 "cat": category or "general",
-                "demand": demand,
+                "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
                 "cost_usd": cost,
-                "ship_usd": ship,
-                "ml_avg": ml_est,
-                "img": "",
-                "desc": f"{q.strip().title()} {variant} por {seller}",
-                "source_url": f"https://www.aliexpress.com/wholesale?SearchText={q.strip().replace(' ', '+')}",
-                "rating": rating,
-                "reviews": orders,
-                "store": seller,
-                "source": "live-hunter",
+                "ship_usd": round(cost * 0.15 + 2, 2),  # 15% of cost + base
+                "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,  # rough ML estimate
+                "img": img,
+                "desc": r.get("name", ""),
+                "source_url": r.get("product_url", ""),
+                "rating": r.get("rating", 4.2),
+                "reviews": r.get("sold_count", 0),
+                "store": r.get("store", r.get("source", "unknown")),
+                "source": r.get("source", "unknown"),
             })
         
+        # Sort
         def _sort_margin(x):
             c = x.get("cost_usd", 0)
             m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
@@ -1918,31 +1951,40 @@ async def get_trending_products(
                 return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
             return x.get("demand", 0)
         
-        sort_map = {
+        def _sort_opp(x):
+            c = x.get("cost_usd", 0)
+            m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
+            if c > 0:
+                return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
+            return x.get("demand", 0)
+        
+        sort_key = {
             "price": lambda x: x.get("cost_usd", 0),
             "margin": _sort_margin,
             "cost": lambda x: x.get("cost_usd", 0),
             "demand": lambda x: x.get("demand", 0),
-            "opportunity": _sort_margin,
+            "opportunity": _sort_opp,
             "rating": lambda x: x.get("rating", 0),
             "reviews": lambda x: x.get("reviews", 0),
             "name": lambda x: x.get("name", "").lower(),
-        }
-        sort_key = sort_map.get(sort_by, lambda x: x.get("demand", 0))
-        products.sort(key=sort_key, reverse=(sort_order != "asc"))
+        }.get(sort_by, lambda x: x.get("demand", 0))
+        normalized.sort(key=sort_key, reverse=(sort_order != "asc"))
         
         return {
-            "products": products[:limit],
-            "count": len(products[:limit]),
-            "total_available": len(products),
+            "products": normalized[:limit],
+            "count": len(normalized[:limit]),
+            "total_available": len(normalized),
             "page": 1,
-            "total_pages": max(1, (len(products) + limit - 1) // limit),
+            "total_pages": max(1, (len(normalized) + limit - 1) // limit),
             "with_images": with_images,
-            "query": q.strip(),
+            "query": query,
+            "sources": sources_used,
             "source": "live",
         }
     
-    # CURATED MODE
+    # ┌────────────────────────────────────────────────────────────────┐
+    # CURATED MODE — only when explicitly requested
+    # └─────────────────────────────────────────────────────────────────┘
     if mode == "curated":
         products = WINNING_NICHES.copy()
         if category:
@@ -1982,110 +2024,116 @@ async def get_trending_products(
             "source": "curated",
         }
     
-    # AUTO-SEARCH MODE - professional sourcing on first load
-    import random, time
-    professional_queries = [
-        "smartwatch deportivo GPS",
-        "auriculares TWS cancelacion ruido",
-        "lampara LED escritorio pro",
-        "cargador inalambrico 3 en 1",
-        "mini proyector portatil 1080p",
-        "hub USB-C multipuerto",
-        "masajeador cervical electrico",
-        "camara WiFi seguridad 360",
-    ]
-    hour_offset = int(time.time() / 3600) % len(professional_queries)
-    auto_query = professional_queries[hour_offset]
-    
-    query = auto_query
-    random.seed(hash(query) % 10000)
-    
-    base_cost = 15
-    q_lower = query.lower()
-    if any(k in q_lower for k in ["proyector", "monitor", "robot", "laptop", "tablet", "camara", "cámara"]):
-        base_cost = 80
-    elif any(k in q_lower for k in ["smartwatch", "teclado", "auricular", "auriculares", "mouse", "cargador", "hub"]):
-        base_cost = 25
-    elif any(k in q_lower for k in ["lampara", "lámpara", "soporte", "organizador", "funda", "cable"]):
-        base_cost = 8
-    elif any(k in q_lower for k in ["masaje", "fitness", "yoga", "deporte", "gym", "bicicleta"]):
-        base_cost = 35
-    elif any(k in q_lower for k in ["cocina", "freidora", "olla", "cafetera", "licuadora"]):
-        base_cost = 45
-    elif any(k in q_lower for k in ["herramienta", "taladro", "atornillador", "sierra"]):
-        base_cost = 30
-    
-    sellers = ["ShenzhenTech", "GuangzhouBest", "YiwuDirect", "HangzhouSmart", "SuzhouQuality", "NingboTrade"]
-    variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Gen 2"]
-    
-    products = []
-    count = random.randint(3, max(3, min(limit, 20)))
-    for i in range(count):
-        cost = round(base_cost * random.uniform(0.5, 1.6), 2)
-        if min_cost is not None and cost < min_cost:
-            continue
-        if max_cost is not None and cost > max_cost:
-            continue
-        
-        variant = random.choice(variants)
-        seller = sellers[i % len(sellers)]
-        rating = round(random.uniform(3.9, 4.9), 1)
-        orders = random.randint(100, 8000)
-        ship = round(cost * 0.12 + 2.5, 2)
-        ml_est = round(cost * 2.8 * 42, 0)
-        demand = min(95, max(55, int(75 + orders / 150)))
-        
-        products.append({
-            "name": f"{query.title()} {variant} — {seller}",
-            "cat": category or "general",
-            "demand": demand,
-            "cost_usd": cost,
-            "ship_usd": ship,
-            "ml_avg": ml_est,
-            "img": "",
-            "desc": f"{query.title()} {variant} por {seller}",
-            "source_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
-            "rating": rating,
-            "reviews": orders,
-            "store": seller,
-            "source": "live-hunter",
-        })
-    
-    def _sort_margin(x):
-        c = x.get("cost_usd", 0)
-        m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
-        if c > 0:
-            return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
-        return x.get("demand", 0)
-    
-    sort_map = {
-        "price": lambda x: x.get("cost_usd", 0),
-        "margin": _sort_margin,
-        "cost": lambda x: x.get("cost_usd", 0),
-        "demand": lambda x: x.get("demand", 0),
-        "opportunity": _sort_margin,
-        "rating": lambda x: x.get("rating", 0),
-        "reviews": lambda x: x.get("reviews", 0),
-        "name": lambda x: x.get("name", "").lower(),
-    }
-    sort_key = sort_map.get(sort_by, lambda x: x.get("demand", 0))
-        products.sort(key=sort_key, reverse=(sort_order != "asc"))
+    # ┌────────────────────────────────────────────────────────────────┐
+# ┌────────────────────────────────────────────────────────────────┐
+# AUTO-SEARCH MODE — professional sourcing on first load
+# └─────────────────────────────────────────────────────────────────┘
+import random, time
+professional_queries = [
+    "smartwatch deportivo GPS",
+    "auriculares TWS cancelacion ruido",
+    "lampara LED escritorio pro",
+    "cargador inalambrico 3 en 1",
+    "mini proyector portatil 1080p",
+    "hub USB-C multipuerto",
+    "masajeador cervical electrico",
+    "camara WiFi seguridad 360",
+]
+hour_offset = int(time.time() / 3600) % len(professional_queries)
+auto_query = professional_queries[hour_offset]
 
-        if with_images and products:
-            products = await enrich_products_with_images(products, max_concurrent=5)
+query = auto_query
+random.seed(hash(query) % 10000)
 
-        return {
-            "products": products[:limit],
-            "count": len(products[:limit]),
-            "total_available": len(products),
-            "page": 1,
-            "total_pages": max(1, (len(products) + limit - 1) // limit),
-            "with_images": with_images,
-            "query": query,
-            "source": "live",
-            "auto": True,
-            "message": f"Búsqueda automática: {query}",
-        }
+base_cost = 15
+q_lower = query.lower()
+if any(k in q_lower for k in ["proyector", "monitor", "robot", "laptop", "tablet", "camara", "cámara"]):
+    base_cost = 80
+elif any(k in q_lower for k in ["smartwatch", "teclado", "auricular", "auriculares", "mouse", "cargador", "hub"]):
+    base_cost = 25
+elif any(k in q_lower for k in ["lampara", "lámpara", "soporte", "organizador", "funda", "cable"]):
+    base_cost = 8
+elif any(k in q_lower for k in ["masaje", "fitness", "yoga", "deporte", "gym", "bicicleta"]):
+    base_cost = 35
+elif any(k in q_lower for k in ["cocina", "freidora", "olla", "cafetera", "licuadora"]):
+    base_cost = 45
+elif any(k in q_lower for k in ["herramienta", "taladro", "atornillador", "sierra"]):
+    base_cost = 30
+
+sellers = ["ShenzhenTech", "GuangzhouBest", "YiwuDirect", "HangzhouSmart", "SuzhouQuality", "NingboTrade"]
+variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Gen 2"]
+
+products = []
+count = random.randint(3, max(3, min(limit, 20)))
+for i in range(count):
+    cost = round(base_cost * random.uniform(0.5, 1.6), 2)
+    if min_cost is not None and cost < min_cost:
+        continue
+    if max_cost is not None and cost > max_cost:
+        continue
+    
+    variant = random.choice(variants)
+    seller = sellers[i % len(sellers)]
+    rating = round(random.uniform(3.9, 4.9), 1)
+    orders = random.randint(100, 8000)
+    ship = round(cost * 0.12 + 2.5, 2)
+    ml_est = round(cost * 2.8 * 42, 0)
+    demand = min(95, max(55, int(75 + orders / 150)))
+    
+    products.append({
+        "name": f"{query.title()} {variant} — {seller}",
+        "cat": category or "general",
+        "demand": demand,
+        "cost_usd": cost,
+        "ship_usd": ship,
+        "ml_avg": ml_est,
+        "img": "",
+        "desc": f"{query.title()} {variant} por {seller}",
+        "source_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
+        "rating": rating,
+        "reviews": orders,
+        "store": seller,
+        "source": "live-hunter",
+    })
+
+def _sort_margin(x):
+    c = x.get("cost_usd", 0)
+    m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
+    if c > 0:
+        return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
+    return x.get("demand", 0)
+
+sort_map = {
+    "price": lambda x: x.get("cost_usd", 0),
+    "margin": _sort_margin,
+    "cost": lambda x: x.get("cost_usd", 0),
+    "demand": lambda x: x.get("demand", 0),
+    "opportunity": _sort_margin,
+    "rating": lambda x: x.get("rating", 0),
+    "reviews": lambda x: x.get("reviews", 0),
+    "name": lambda x: x.get("name", "").lower(),
+}
+sort_key = sort_map.get(sort_by, lambda x: x.get("demand", 0))
+products.sort(key=sort_key, reverse=(sort_order != "asc"))
+
+# Enriquecer con imágenes reales si se solicita
+if with_images and products:
+    products = await enrich_products_with_images(products, max_concurrent=5)
+
+return {
+    "products": products[:limit],
+    "count": len(products[:limit]),
+    "total_available": len(products),
+    "page": 1,
+    "total_pages": max(1, (len(products) + limit - 1) // limit),
+    "with_images": with_images,
+    "query": query,
+    "source": "live",
+    "auto": True,
+    "message": f"Búsqueda automática: {query}",
+}
+
+
 
 @app.get("/api/hunter/categories")
 def get_hunter_categories():
