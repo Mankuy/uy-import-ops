@@ -2075,6 +2075,10 @@ for r in all_results:
         "source": r.get("source", "auto-hunter"),
     })
 
+# Enrich with real images if requested
+if with_images and normalized:
+    normalized = await enrich_products_with_images(normalized, max_concurrent=5)
+
 return {
 "products": normalized,
 "count": len(normalized),
