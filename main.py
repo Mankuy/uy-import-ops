@@ -1879,7 +1879,7 @@ async def get_trending_products(
         variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Gen 2"]
         
         products = []
-        count = random.randint(5, min(limit, 20))
+        count = random.randint(3, max(3, min(limit, 20)))
         for i in range(count):
             cost = round(base_cost * random.uniform(0.4, 1.8), 2)
             if min_cost is not None and cost < min_cost:
@@ -2019,7 +2019,7 @@ async def get_trending_products(
     variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Gen 2"]
     
     products = []
-    count = random.randint(6, min(limit, 16))
+    count = random.randint(3, max(3, min(limit, 20)))
     for i in range(count):
         cost = round(base_cost * random.uniform(0.5, 1.6), 2)
         if min_cost is not None and cost < min_cost:
@@ -2069,20 +2069,23 @@ async def get_trending_products(
         "name": lambda x: x.get("name", "").lower(),
     }
     sort_key = sort_map.get(sort_by, lambda x: x.get("demand", 0))
-    products.sort(key=sort_key, reverse=(sort_order != "asc"))
-    
-    return {
-        "products": products[:limit],
-        "count": len(products[:limit]),
-        "total_available": len(products),
-        "page": 1,
-        "total_pages": max(1, (len(products) + limit - 1) // limit),
-        "with_images": with_images,
-        "query": query,
-        "source": "live",
-        "auto": True,
-        "message": f"Búsqueda automática: {query}",
-    }
+        products.sort(key=sort_key, reverse=(sort_order != "asc"))
+
+        if with_images and products:
+            products = await enrich_products_with_images(products, max_concurrent=5)
+
+        return {
+            "products": products[:limit],
+            "count": len(products[:limit]),
+            "total_available": len(products),
+            "page": 1,
+            "total_pages": max(1, (len(products) + limit - 1) // limit),
+            "with_images": with_images,
+            "query": query,
+            "source": "live",
+            "auto": True,
+            "message": f"Búsqueda automática: {query}",
+        }
 
 @app.get("/api/hunter/categories")
 def get_hunter_categories():
