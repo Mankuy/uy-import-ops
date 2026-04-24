@@ -798,9 +798,10 @@ class ImportCalcInput(BaseModel):
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     count = db.query(Product).count()
-    if count == 0:
-        added = run_product_hunter(db)
-        print(f"Product Hunter auto-init: added {added} products")
+    # Auto-seeding disabled — user adds products manually
+    # if count == 0:
+    #     added = run_product_hunter(db)
+    #     print(f"Product Hunter auto-init: added {added} products")
     db.close()
     yield
 
@@ -957,6 +958,17 @@ async def refresh_product_images():
         "failed": failed,
         "message": f"Images refreshed. {updated} updated, {skipped} skipped (already had real images), {failed} failed."
     }
+
+
+@app.post("/api/products/clear-all")
+def clear_all_products():
+    """Delete all products from the database."""
+    db = SessionLocal()
+    count = db.query(Product).count()
+    db.query(Product).delete()
+    db.commit()
+    db.close()
+    return {"deleted": count, "message": f"All {count} products deleted."}
 
 @app.get("/api/products/{pid}")
 def get_product(pid: int):
@@ -1790,9 +1802,46 @@ async def get_trending_products(
     limit: int = 20,
     page: int = 1,
     with_images: bool = False,
+    q: Optional[str] = None,
 ):
-    """Get AI-curated trending products with pre-calibrated margins and enriched data.
-    Set with_images=true to fetch real product photos via Bing (slower but accurate)."""
+    """Get AI-curated trending products OR live AliExpress search.
+    Pass ?q=auriculares to search AliExpress in real time.
+    Set with_images=true to fetch real product photos via Bing."""
+    
+    # Live search mode
+    if q and q.strip():
+        hunter = ProductHunter()
+        results = await hunter.search_aliexpress(q.strip(), limit)
+        # Normalize AliExpress results to match trending format
+        normalized = []
+        for r in results:
+            normalized.append({
+                "name": r.get("title", "Unknown"),
+                "cat": category or "tecnologia",
+                "demand": 75,
+                "cost_usd": r.get("price_usd", 10),
+                "ship_usd": 3.5,
+                "ml_avg": r.get("price_usd", 10) * 2.5,
+                "img": r.get("image", ""),
+                "desc": r.get("title", ""),
+                "source_url": r.get("url", ""),
+                "rating": r.get("rating", 4.5),
+                "reviews": r.get("orders", 0),
+                "store": r.get("store", ""),
+                "source": "aliexpress-live",
+            })
+        return {
+            "products": normalized,
+            "count": len(normalized),
+            "total_available": len(normalized),
+            "page": 1,
+            "total_pages": 1,
+            "with_images": False,
+            "query": q,
+            "source": "aliexpress-live",
+        }
+    
+    # Static curated mode
     products = WINNING_NICHES.copy()
     if category:
         products = [p for p in products if p.get("cat") == category]
@@ -1817,6 +1866,7 @@ async def get_trending_products(
         "page": page,
         "total_pages": (total + limit - 1) // limit,
         "with_images": with_images,
+        "source": "curated",
     }
 
 @app.get("/api/hunter/categories")
