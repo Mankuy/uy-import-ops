@@ -497,7 +497,7 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
             if len(products) < 3:
                 # Extract from murl-style image references + titles nearby
                 titles = re.findall(r'class="[^"]*(?:title|prod)[^"]*"[^>]*>([^<]{10,200})</', html)
-                prices = re.findall(r'["']?(?:price|cost)["']?\s*[:=]\s*["']?([0-9]+[.,]?[0-9]*)["']?', html, re.I)
+                prices = re.findall(r'''["']?(?:price|cost)["']?\s*[:=]\s*["']?([0-9]+[.,]?[0-9]*)["']?''', html, re.I)
                 imgs = re.findall(r'"?(https?://[^"\s]+\.(?:jpg|jpeg|png|webp))"?', html)
                 
                 for i, title in enumerate(titles[:limit]):
