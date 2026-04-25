@@ -1970,6 +1970,13 @@ async def get_trending_products(
         }.get(sort_by, lambda x: x.get("demand", 0))
         normalized.sort(key=sort_key, reverse=(sort_order != "asc"))
         
+        # Enrich with real images from Bing Images
+        if with_images and normalized:
+            try:
+                normalized = await enrich_products_with_images(normalized, max_concurrent=3)
+            except Exception as e:
+                print(f"[Hunter] Image enrichment failed: {e}")
+        
         return {
             "products": normalized[:limit],
             "count": len(normalized[:limit]),
