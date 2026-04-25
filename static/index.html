@@ -1849,8 +1849,8 @@ async function loadNiches(page = 1) {
   pagination.classList.add('hidden');
   if (sourceBadge) sourceBadge.classList.add('hidden');
   
-  try {
-    let url = API + '/hunter/trending?limit=' + window.hunterLimit + '&page=' + page + '&with_images=' + withImages;
+    try {
+    let url = API + '/api/hunter/trending?limit=' + window.hunterLimit + '&page=' + page + '&with_images=' + withImages;
     url += '&sort_by=' + encodeURIComponent(sortBy) + '&sort_order=' + encodeURIComponent(sortOrder);
     if (query) url += '&q=' + encodeURIComponent(query);
     if (minCost !== '' && !isNaN(minCost)) url += '&min_cost=' + minCost;
