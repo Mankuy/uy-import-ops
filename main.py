@@ -2024,83 +2024,83 @@ async def get_trending_products(
             "source": "curated",
         }
     
-# ┌────────────────────────────────────────────────────────────────┐
-# AUTO-SEARCH MODE — real product hunter on first load
-# └─────────────────────────────────────────────────────────────────┘
-# When no query is provided, auto-search trending product categories
-import random
-auto_queries = [
-    "auriculares inalámbricos", "smartwatch", "lampara led",
-    "cargador movil", "proyector hd", "parlantes bluetooth",
-    "masajeador cervical", "auriculares cancelacion ruido",
-    "teclado inalambrico", "mouse gamer"
-]
-auto_query = random.choice(auto_queries)
+    # ┌────────────────────────────────────────────────────────────────┐
+    # AUTO-SEARCH MODE — real product hunter on first load
+    # └─────────────────────────────────────────────────────────────────┘
+    # When no query is provided, auto-search trending product categories
+    import random
+    auto_queries = [
+        "auriculares inalámbricos", "smartwatch", "lampara led",
+        "cargador movil", "proyector hd", "parlantes bluetooth",
+        "masajeador cervical", "auriculares cancelacion ruido",
+        "teclado inalambrico", "mouse gamer"
+    ]
+    auto_query = random.choice(auto_queries)
 
-# Run the same live search pipeline as a real query would
-auto_all = []
-auto_sources = []
+    # Run the same live search pipeline as a real query would
+    auto_all = []
+    auto_sources = []
 
-# Step 1: Bing Shopping (HTTP-only, works on Render)
-try:
-    bing_results = await search_bing_shopping(auto_query, limit=limit)
-    if bing_results:
-        auto_all.extend(bing_results)
-        auto_sources.append("bing-shopping")
-except Exception as e:
-    print(f"[Auto-Hunter] Bing Shopping failed: {e}")
-
-# Step 2: Bing Web fallback
-if len(auto_all) < 3:
+    # Step 1: Bing Shopping (HTTP-only, works on Render)
     try:
-        web_results = await search_bing_web_products(auto_query, limit=limit)
-        if web_results:
-            auto_all.extend(web_results)
-            auto_sources.append("bing-web")
+        bing_results = await search_bing_shopping(auto_query, limit=limit)
+        if bing_results:
+            auto_all.extend(bing_results)
+            auto_sources.append("bing-shopping")
     except Exception as e:
-        print(f"[Auto-Hunter] Bing Web failed: {e}")
+        print(f"[Auto-Hunter] Bing Shopping failed: {e}")
 
-# Normalize auto-search results
-auto_normalized = []
-for r in auto_all:
-    cost = r.get("price_usd", 0)
-    img = r.get("image_url", "")
-    if not img:
-        img = _image_cache.get(r.get("name", ""), "")
-    
-    auto_normalized.append({
-        "name": r.get("name", "Unknown")[:150],
-        "cat": "general",
-        "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
-        "cost_usd": cost,
-        "ship_usd": round(cost * 0.15 + 2, 2),
-        "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,
-        "img": img,
-        "desc": r.get("name", ""),
-        "source_url": r.get("product_url", ""),
-        "rating": r.get("rating", 4.2),
-        "reviews": r.get("sold_count", 0),
-        "store": r.get("store", r.get("source", "auto")),
-        "source": r.get("source", "auto-hunter"),
-    })
+    # Step 2: Bing Web fallback
+    if len(auto_all) < 3:
+        try:
+            web_results = await search_bing_web_products(auto_query, limit=limit)
+            if web_results:
+                auto_all.extend(web_results)
+                auto_sources.append("bing-web")
+        except Exception as e:
+            print(f"[Auto-Hunter] Bing Web failed: {e}")
 
-# Enrich with real images from Bing if requested
-if with_images and auto_normalized:
-    auto_normalized = await enrich_products_with_images(auto_normalized, max_concurrent=5)
+    # Normalize auto-search results
+    auto_normalized = []
+    for r in auto_all:
+        cost = r.get("price_usd", 0)
+        img = r.get("image_url", "")
+        if not img:
+            img = _image_cache.get(r.get("name", ""), "")
+        
+        auto_normalized.append({
+            "name": r.get("name", "Unknown")[:150],
+            "cat": "general",
+            "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
+            "cost_usd": cost,
+            "ship_usd": round(cost * 0.15 + 2, 2),
+            "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,
+            "img": img,
+            "desc": r.get("name", ""),
+            "source_url": r.get("product_url", ""),
+            "rating": r.get("rating", 4.2),
+            "reviews": r.get("sold_count", 0),
+            "store": r.get("store", r.get("source", "auto")),
+            "source": r.get("source", "auto-hunter"),
+        })
 
-return {
-    "products": auto_normalized[:limit],
-    "count": len(auto_normalized[:limit]),
-    "total_available": len(auto_normalized),
-    "page": 1,
-    "total_pages": max(1, (len(auto_normalized) + limit - 1) // limit),
-    "with_images": with_images,
-    "query": auto_query,
-    "sources": auto_sources,
-    "source": "auto-hunter",
-    "message": f"Auto-búsqueda: {auto_query}",
-    "auto": True,
-}
+    # Enrich with real images from Bing if requested
+    if with_images and auto_normalized:
+        auto_normalized = await enrich_products_with_images(auto_normalized, max_concurrent=5)
+
+    return {
+        "products": auto_normalized[:limit],
+        "count": len(auto_normalized[:limit]),
+        "total_available": len(auto_normalized),
+        "page": 1,
+        "total_pages": max(1, (len(auto_normalized) + limit - 1) // limit),
+        "with_images": with_images,
+        "query": auto_query,
+        "sources": auto_sources,
+        "source": "auto-hunter",
+        "message": f"Auto-búsqueda: {auto_query}",
+        "auto": True,
+    }
 
 @app.get("/api/hunter/categories")
 def get_hunter_categories():
