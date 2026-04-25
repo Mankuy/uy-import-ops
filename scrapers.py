@@ -448,7 +448,7 @@ class AIProductHunter:
 # ═══════════════════════════════════════════════════════════════
 
 async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
-    """Search Bing Shopping for real products. Lightweight HTTP-only."""
+    """Search Bing Shopping. Render-safe."""
     search_url = f"https://www.bing.com/shop?q={query.replace(' ', '+')}&form=SHOPSB"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -458,7 +458,7 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
     }
     try:
         import httpx
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client:
             resp = await client.get(search_url, headers=headers)
             if resp.status_code != 200:
                 return []
@@ -466,9 +466,7 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
             html = resp.text
             products = []
             
-            # Bing Shopping uses structured data in script tags
-            # Try to find product cards
-            # Pattern 1: brqItem data
+            # Pattern 1
             item_pattern = re.compile(r'"title":"([^"]{5,200})","url":"([^"]+)","image":"([^"]+)".*?"price":"?([0-9.,]+)"?')
             for m in item_pattern.finditer(html):
                 title = m.group(1).replace('\u0026', '&').replace('\u0027', "'")
@@ -477,40 +475,30 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
                 price_str = m.group(4).replace(',', '')
                 try:
                     price = float(price_str)
-                    if price > 500:  # Likely local currency, convert roughly
-                        price = price / 42  # Assume UYU, convert to USD roughly
+                    if price > 500:
+                        price = price / 42
                 except:
                     price = 0
                 
                 if title and len(title) > 5:
-                    # Resolve Bing redirect URLs to actual product URLs
-                    resolved_url = url
-                    if 'bing.com' in url and '/aclk?' in url:
-                        try:
-                            import httpx
-                            async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as redirect_client:
-                                resp = await redirect_client.head(url, headers={"User-Agent": "Mozilla/5.0"})
-                                resolved_url = str(resp.url)
-                        except:
-                            pass  # Keep Bing URL if redirect fails
-
+                    resolved_url = url if url.startswith('http') else f"https://www.bing.com{url}"
                     products.append({
                         "name": title[:150],
                         "price_usd": round(price, 2) if price > 0 else 0,
                         "image_url": img if img.startswith('http') else '',
-                        "product_url": resolved_url if resolved_url.startswith('http') else f"https://www.bing.com{url}",
+                        "product_url": resolved_url,
                         "source": "bing-shopping",
                         "rating": 0,
                         "sold_count": 0,
                     })
             
-            # Pattern 2: broader extraction from product card divs
+            # Pattern 2 — fallback: regex simple (sin comillas triple)
             if len(products) < 3:
-                # Extract from murl-style image references + titles nearby
                 titles = re.findall(r'class="[^"]*(?:title|prod)[^"]*"[^>]*>([^<]{10,200})</', html)
-                prices = re.findall(r'''["']?(?:price|cost)["']?\s*[:=]\s*["']?([0-9]+[.,]?[0-9]*)["']?''', html, re.I)
-                imgs = re.findall(r'"?(https?://[^"\s]+\.(?:jpg|jpeg|png|webp))"?', html)
-
+                # Usar regex alternativo que no rompe con comillas
+                prices = re.findall(r"""['"]?(?:price|cost)['"]?\s*[:=]\s*['"]?([0-9]+[.,]?[0-9]*)['"]?""", html, re.I)
+                imgs = re.findall(r'"?https?://[^"\s]+\.(?:jpg|jpeg|png|webp)"?', html)
+                
                 for i, title in enumerate(titles[:limit]):
                     title_clean = re.sub(r'<[^>]+>', '', title).strip()
                     p = float(prices[i].replace(',', '')) if i < len(prices) else 0
@@ -521,175 +509,14 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
                         "name": title_clean[:150],
                         "price_usd": round(p, 2) if p > 0 else 0,
                         "image_url": img,
-                        "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
+                        "product_url": f"https://www.bing.com/shop?q={query.replace(' ', '+')}",
                         "source": "bing-shopping-fallback",
                         "rating": 0,
                         "sold_count": 0,
                     })
-
-        return products[:limit]
-    except Exception as e:
-        print(f"[Bing Shopping] Error: {e}")
-        return []
-    """Fallback: Bing Web search with product-oriented extraction."""
-    search_url = f"https://www.bing.com/search?q={query.replace(' ', '+')}+buy+price"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "es-ES,es;q=0.9",
-    }
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
-            resp = await client.get(search_url, headers=headers)
-            if resp.status_code != 200:
-                return []
-            
-            html = resp.text
-            products = []
-            
-            # Bing shows product cards with prices in search results
-            # Extract titles from h2 tags in result cards
-            results = re.findall(r'<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>([^<]{10,200})</a></h2>', html)
-            prices = re.findall(r'\$([0-9]+[.,]?[0-9]*)', html)
-            imgs = re.findall(r'"(https?://[^"]+\.(?:jpg|jpeg|png|webp))"', html)
-            
-            for i, (url, title) in enumerate(results[:limit]):
-                title_clean = re.sub(r'<[^>]+>', '', title).strip()
-                p = 0
-                if i < len(prices):
-                    try:
-                        p = float(prices[i].replace(',', ''))
-                        if p > 500:
-                            p = p / 42
-                    except:
-                        pass
-                img = imgs[i] if i < len(imgs) else ""
-                products.append({
-                    "name": title_clean[:150],
-                    "price_usd": round(p, 2) if p > 0 else 0,
-                    "image_url": img,
-                    "product_url": url if url.startswith('http') else f"https://www.bing.com{url}",
-                    "source": "bing-web",
-                    "rating": 0,
-                    "sold_count": 0,
-                })
             
             return products[:limit]
     except Exception as e:
-        print(f"[Bing Web] Error: {e}")
+        print(f"[Bing Shopping] Error: {e}")
         return []
 
-def generate_mock_sourcing_data(query: str, limit: int = 20) -> List[Dict]:
-    """Generate realistic mock sourcing data when all scrapers fail."""
-    import random
-    seed = hash(query.lower().strip()) % 10000
-    random.seed(seed)
-    
-    # Base price by keyword
-    base_cost = 15
-    q = query.lower()
-    if any(k in q for k in ["proyector", "drone", "monitor", "robot", "laptop", "tablet", "cámara"]):
-        base_cost = 80
-    elif any(k in q for k in ["smartwatch", "teclado", "auricular", "mouse", "cargador", "hub", "adaptador"]):
-        base_cost = 25
-    elif any(k in q for k in ["lámpara", "soporte", "organizador", "funda", "cable", "estuche", "bolso"]):
-        base_cost = 8
-    elif any(k in q for k in ["masaje", "fitness", "yoga", "deporte", "gym", "bicicleta"]):
-        base_cost = 35
-    elif any(k in q for k in ["cocina", "freidora", "olla", "cafetera", "licuadora", "batidora"]):
-        base_cost = 45
-    elif any(k in q for k in ["herramienta", "taladro", "atornillador", "sierra", "medidor"]):
-        base_cost = 30
-    elif any(k in q for k in ["mascota", "perro", "gato", "pecera", "comedero", "juguete"]):
-        base_cost = 12
-    
-    sellers = ["ShenzhenTech", "GuangzhouBest", "YiwuDirect", "HangzhouSmart", "SuzhouQuality", "NingboTrade", "ShenzhenPro"]
-    variants = ["Original", "Premium", "2024", "Pro", "Plus", "Max", "Ultra", "Lite", "2025", "Gen 2"]
-    
-    products = []
-    count = random.randint(3, min(limit, 24))
-    
-    # Realistic product name templates by category
-    product_templates = {
-        "auricular": ["Auriculares Bluetooth TWS", "Auriculares ANC Pro", "Headphones DJ Studio", "Auriculares Deportivos IPX7", "Earbuds HiFi Bass"],
-        "smartwatch": ["Smartwatch Ultra 2", "Reloj Inteligente AMOLED", "Smart Band Pro 2025", "Smartwatch Kids GPS", "Watch Fitness Tracker"],
-        "lampara": ["Lampara LED Escritorio", "Lampara RGB Gamer", "Lampara Solar Jardin", "Tira LED 5M RGB", "Lampara Noche Touch"],
-        "cargador": ["Cargador 65W GaN", "Power Bank 20000mAh", "Cargador MagSafe 15W", "Cargador Auto USB-C", "Cargador Inalambrico 3en1"],
-        "proyector": ["Proyector Full HD 1080p", "Mini Proyector Portatil", "Proyector WiFi 4K", "Proyector Android 11", "Proyector Cine Casa"],
-        "parlante": ["Parlante Bluetooth JBL-style", "Speaker TWS Stereo", "Parlante Bass 30W", "Soundbar TV 2.1", "Parlante Portatil IPX7"],
-        "masaje": ["Masajeador Cervical EMS", "Pistola Masaje 6 Vel", "Almohada Masaje Shiatsu", "Masajeador Espalda Heat", "Rodillo Masaje Pies"],
-        "teclado": ["Teclado Mecanico RGB", "Keyboard 60% Hot-Swap", "Teclado Bluetooth Slim", "Teclado Gaming Macro", "Keyboard Numeric Pad"],
-        "mouse": ["Mouse Gamer 16000DPI", "Mouse Ergonomico Vertical", "Mouse Silent Click", "Mouse Pad RGB XL", "Mouse Tri-Mode WiFi"],
-    }
-    
-    # Find matching template category
-    template_key = None
-    for key in product_templates:
-        if key in q:
-            template_key = key
-            break
-    if template_key is None:
-        template_key = random.choice(list(product_templates.keys()))
-    
-    templates = product_templates[template_key]
-    
-    # Unsplash fallback images by category
-    unsplash_imgs = {
-        "auricular": "https://images.unsplash.com/photo-1505740420928-5e560c327914?w=400&h=400&fit=crop",
-        "smartwatch": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-        "lampara": "https://images.unsplash.com/photo-1507473885765-e6ed057ab852?w=400&h=400&fit=crop",
-        "cargador": "https://images.unsplash.com/photo-1583863788434-e58a4e3b0e3e?w=400&h=400&fit=crop",
-        "proyector": "https://images.unsplash.com/photo-1478720528107-ce6441d75447?w=400&h=400&fit=crop",
-        "parlante": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop",
-        "masaje": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=400&fit=crop",
-        "teclado": "https://images.unsplash.com/photo-1587829741301-dc798b116add?w=400&h=400&fit=crop",
-        "mouse": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop",
-    }
-    fallback_img = unsplash_imgs.get(template_key, "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=400&h=400&fit=crop")
-    
-    for i in range(count):
-        cost = round(base_cost * random.uniform(0.4, 1.8), 2)
-        variant = random.choice(variants)
-        seller = sellers[i % len(sellers)]
-        rating = round(random.uniform(3.8, 4.9), 1)
-        orders = random.randint(50, 5000)
-        product_name = templates[i % len(templates)]
-        
-        products.append({
-            "name": f"{product_name} {variant}",
-            "price_usd": cost,
-            "image_url": fallback_img,
-            "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
-            "product_id": f"MOCK_{seed}_{i}",
-            "rating": rating,
-            "sold_count": orders,
-            "source": "mock-fallback",
-            "store": seller,
-        })
-    
-    # Sort by a proxy of quality (rating * orders / price)
-    products.sort(key=lambda x: (x["rating"] * x["sold_count"]) / max(x["price_usd"], 1), reverse=True)
-    return products
-
-class ProductHunter:
-    def __init__(self):
-        self.ali = AliExpressScraper()
-        self.cn = Cn1688Scraper()
-        self.ai = AIProductHunter()
-    
-    async def search_aliexpress(self, query: str, limit: int = 10) -> List[Dict]:
-        return await self.ali.search_products(query, limit)
-    
-    async def analyze_url(self, url: str) -> Optional[Dict]:
-        if 'aliexpress.com' in url:
-            return await self.ali.analyze_product_url(url)
-        elif '1688.com' in url:
-            return await self.cn.search_products(url)  # simplified
-        return None
-    
-    def get_trending(self, **kwargs) -> List[Dict]:
-        return self.ai.get_trending(**kwargs)
-    
-    def search_trending(self, query: str) -> List[Dict]:
-        return self.ai.search_niches(query)
