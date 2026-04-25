@@ -1,0 +1,3217 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UY Import Ops — Hunter Dashboard v5.1</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' },
+            brand: { 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' },
+            accent: { 400: '#4ade80', 500: '#22c55e', 600: '#16a34a' },
+            danger: { 400: '#f87171', 500: '#ef4444' },
+            gold: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
+            purple: { 400: '#c084fc', 500: '#a855f7' },
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.3s ease-out',
+            'slide-up': 'slideUp 0.4s ease-out',
+            'slide-in': 'slideIn 0.3s ease-out',
+            'pulse-slow': 'pulse 3s infinite',
+            'count': 'countUp 1s ease-out',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            slideUp: {
+              '0%': { opacity: '0', transform: 'translateY(20px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+            slideIn: {
+              '0%': { opacity: '0', transform: 'translateX(-10px)' },
+              '100%': { opacity: '1', transform: 'translateX(0)' },
+            },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    
+    :root {
+      --glass-bg: rgba(30,41,59,0.5);
+      --glass-border: rgba(255,255,255,0.05);
+      --card-hover: rgba(56,189,248,0.15);
+    }
+    
+    .light-mode {
+      --glass-bg: rgba(255,255,255,0.7);
+      --glass-border: rgba(0,0,0,0.05);
+      --card-hover: rgba(14,165,233,0.1);
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      transition: all 0.3s ease;
+    }
+    
+    .glass-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .glass-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      border-color: rgba(56,189,248,0.2);
+    }
+    
+    .light-mode .glass-hover:hover {
+      box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+      border-color: rgba(14,165,233,0.3);
+    }
+    
+    .gradient-text {
+      background: linear-gradient(135deg, #38bdf8, #4ade80);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .gradient-border {
+      position: relative;
+    }
+    
+    .gradient-border::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(56,189,248,0.5), rgba(74,222,128,0.3));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .gradient-border:hover::before {
+      opacity: 1;
+    }
+    
+    .tab-content {
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    .tab-content.hidden {
+      display: none;
+      animation: none;
+    }
+    
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .toast {
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 300px;
+      max-width: 400px;
+      animation: slideIn 0.3s ease-out, fadeIn 0.3s ease-out;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      backdrop-filter: blur(12px);
+    }
+    
+    .toast-success {
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: #4ade80;
+    }
+    
+    .toast-error {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #f87171;
+    }
+    
+    .toast-info {
+      background: rgba(56,189,248,0.15);
+      border: 1px solid rgba(56,189,248,0.3);
+      color: #38bdf8;
+    }
+    
+    .toast-exit {
+      animation: fadeOut 0.3s ease-out forwards;
+    }
+    
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateX(20px); }
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .sidebar.collapsed {
+      width: 70px;
+    }
+    
+    .sidebar.collapsed .sidebar-text,
+    .sidebar.collapsed .sidebar-brand-sub,
+    .sidebar.collapsed .sidebar-section-title {
+      display: none;
+    }
+    
+    .sidebar.collapsed .sidebar-btn {
+      justify-content: center;
+      padding: 12px;
+    }
+    
+    /* Product Cards */
+    .product-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+    
+    .product-card:hover {
+      transform: translateY(-6px) scale(1.01);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+    }
+    
+    .light-mode .product-card:hover {
+      box-shadow: 0 24px 64px rgba(0,0,0,0.15);
+    }
+    
+    .product-card .card-image {
+      transition: transform 0.5s ease;
+    }
+    
+    .product-card:hover .card-image {
+      transform: scale(1.08);
+    }
+    
+    /* Loading Spinner */
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(56,189,248,0.2);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    
+    .empty-state-icon {
+      font-size: 4rem;
+      opacity: 0.5;
+      margin-bottom: 16px;
+    }
+    
+    /* Keyboard Shortcut Badge */
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #94a3b8;
+    }
+    
+    .light-mode .kbd {
+      background: rgba(0,0,0,0.05);
+      border-color: rgba(0,0,0,0.1);
+      color: #64748b;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    .light-mode ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+    .light-mode ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    /* Shimmer Loading */
+    .shimmer {
+      background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    
+    .light-mode .shimmer {
+      background: linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+    }
+    
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    /* Mobile */
+    @media (max-width: 1024px) {
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        z-index: 50;
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 40;
+      }
+      .sidebar-overlay.open {
+        display: block;
+      }
+    }
+    
+    /* Number counter animation */
+    @property --num {
+      syntax: '<integer>';
+      initial-value: 0;
+      inherits: false;
+    }
+    
+    .count-animate {
+      animation: countUp 1s ease-out forwards;
+    }
+    
+    /* Modal */
+    .modal-enter {
+      animation: modalEnter 0.2s ease-out;
+    }
+    
+    @keyframes modalEnter {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    /* Strategy badges */
+    .strategy-tag { font-size: 0.65rem; padding: 2px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .strat-cost-plus { background: rgba(148,163,184,0.15); color: #94a3b8; }
+    .strat-aggressive { background: rgba(56,189,248,0.15); color: #38bdf8; }
+    .strat-luxury { background: rgba(192,132,252,0.15); color: #c084fc; }
+    .strat-extreme { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .strat-value { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .strat-premium { background: rgba(244,114,182,0.15); color: #f472b6; }
+    
+    .margin-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .margin-great { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+    .margin-good { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+    .margin-ok { background: rgba(192,132,252,0.15); color: #c084fc; border: 1px solid rgba(192,132,252,0.3); }
+    .margin-low { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+    
+    #statusChart { width: 100% !important; height: 100% !important; }
+    
+    .product-img { width: 100%; height: 180px; object-fit: cover; border-radius: 12px 12px 0 0; }
+    
+    .score-high { color: #4ade80; }
+    .score-mid { color: #fbbf24; }
+    .score-low { color: #f87171; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Mobile Sidebar Overlay -->
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<div class="flex h-screen overflow-hidden">
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
+    <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-black tracking-tight">UY<span class="gradient-text">Hunter</span></h1>
+        <p class="sidebar-brand-sub text-xs text-slate-500 mt-1 font-medium">Import Ops v5.1</p>
+      </div>
+      <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white transition hidden lg:block">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    
+    <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+      <p class="sidebar-section-title text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2">Menu</p>
+      <button onclick="showTab('dashboard')" id="nav-dashboard" class="nav-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl text-sm font-semibold bg-brand-600/10 text-brand-400 border border-brand-600/20 transition flex items-center gap-3">
+        <span class="text-lg">🎯</span>
+        <span class="sidebar-text">Dashboard</span>
+        <span class="sidebar-text ml-auto kbd hidden">1</span>
+      </button>
+      <button onclick="showTab('hunter')" id="nav-hunter" class="nav-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center gap-3">
+        <span class="text-lg">🤖</span>
+        <span class="sidebar-text">Product Hunter</span>
+        <span class="sidebar-text ml-auto kbd hidden">2</span>
+      </button>
+      <button onclick="showTab('products')" id="nav-products" class="nav-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center gap-3">
+        <span class="text-lg">📦</span>
+        <span class="sidebar-text">Productos</span>
+        <span class="sidebar-text ml-auto kbd hidden">3</span>
+      </button>
+      <button onclick="showTab('calculator')" id="nav-calculator" class="nav-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center gap-3">
+        <span class="text-lg">🧮</span>
+        <span class="sidebar-text">Calculadora</span>
+        <span class="sidebar-text ml-auto kbd hidden">4</span>
+      </button>
+      <button onclick="showTab('mlsearch')" id="nav-mlsearch" class="nav-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center gap-3">
+        <span class="text-lg">🔍</span>
+        <span class="sidebar-text">ML Uruguay</span>
+        <span class="sidebar-text ml-auto kbd hidden">5</span>
+      </button>
+      <button onclick="showTab('tracking')" id="nav-tracking" class="nav-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center gap-3">
+        <span class="text-lg">🚚</span>
+        <span class="sidebar-text">Seguimiento</span>
+        <span class="sidebar-text ml-auto kbd hidden">6</span>
+      </button>
+      <button onclick="showTab('marketing')" id="nav-marketing" class="nav-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center gap-3">
+        <span class="text-lg">🚀</span>
+        <span class="sidebar-text">Marketing</span>
+        <span class="sidebar-text ml-auto kbd hidden">7</span>
+      </button>
+    </nav>
+    
+    <div class="p-4 border-t border-slate-800 space-y-3">
+      <div class="glass rounded-xl p-4">
+        <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Cotización</p>
+        <p class="text-xl font-bold text-brand-400 mt-1">$ 42.00 <span class="text-sm font-normal text-slate-500">UYU/USD</span></p>
+      </div>
+      <button onclick="runHunter()" id="hunter-btn" class="sidebar-btn w-full bg-gradient-to-r from-accent-500/20 to-brand-500/20 hover:from-accent-500/30 hover:to-brand-500/30 text-accent-400 border border-accent-500/30 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2">
+        <span class="text-lg">🚀</span>
+        <span class="sidebar-text">Lanzar Hunter</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 overflow-y-auto relative">
+    <!-- Mobile Header -->
+    <header class="sticky top-0 z-20 glass border-b border-slate-800 px-4 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <button onclick="openSidebar()" class="lg:hidden text-slate-400 hover:text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div>
+          <h2 id="page-title" class="text-lg lg:text-xl font-bold">Dashboard</h2>
+          <p id="page-subtitle" class="text-xs text-slate-500 mt-0.5 hidden sm:block">Resumen de tu operación de importación</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2 lg:gap-3">
+        <!-- Global Search -->
+        <div class="hidden md:flex items-center relative">
+          <input type="text" id="global-search" placeholder="Buscar... (Ctrl+K)" 
+            class="bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm w-48 lg:w-64 focus:border-brand-500 focus:outline-none transition"
+            onkeypress="if(event.key==='Enter')globalSearch()">
+          <svg class="w-4 h-4 text-slate-500 absolute left-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+        
+        <!-- Dark Mode Toggle -->
+        <button onclick="toggleDarkMode()" class="p-2 rounded-xl hover:bg-slate-800 transition" title="Cambiar tema">
+          <span id="theme-icon">🌙</span>
+        </button>
+        
+        <span id="hunter-status" class="hidden px-3 py-1.5 rounded-full bg-accent-500/10 text-accent-400 text-xs font-bold border border-accent-500/20 animate-pulse">
+          🤖 Hunter activo...
+        </span>
+        
+        <button onclick="openAddModal()" class="bg-brand-600 hover:bg-brand-500 text-white px-4 lg:px-5 py-2.5 rounded-xl text-sm font-semibold transition shadow-lg shadow-brand-600/20 flex items-center gap-2">
+          <span class="hidden sm:inline">+ Agregar</span>
+          <span class="sm:hidden">+</span>
+          <span class="kbd hidden lg:inline-flex">N</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="p-4 lg:p-8 max-w-7xl mx-auto">
+
+      <!-- DASHBOARD -->
+      <div id="tab-dashboard" class="tab-content space-y-6 lg:space-y-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
+          <div class="glass rounded-2xl p-4 lg:p-5 glass-hover gradient-border">
+            <p class="text-slate-500 text-[10px] lg:text-xs uppercase tracking-wider font-bold">Productos</p>
+            <p class="text-2xl lg:text-3xl font-black mt-2" id="stat-total">0</p>
+          </div>
+          <div class="glass rounded-2xl p-4 lg:p-5 glass-hover gradient-border">
+            <p class="text-slate-500 text-[10px] lg:text-xs uppercase tracking-wider font-bold">Margen Promedio</p>
+            <p class="text-2xl lg:text-3xl font-black mt-2 text-accent-400" id="stat-margin">0%</p>
+          </div>
+          <div class="glass rounded-2xl p-4 lg:p-5 glass-hover gradient-border">
+            <p class="text-slate-500 text-[10px] lg:text-xs uppercase tracking-wider font-bold">+60% Margen</p>
+            <p class="text-2xl lg:text-3xl font-black mt-2 text-gold-400" id="stat-high">0</p>
+          </div>
+          <div class="glass rounded-2xl p-4 lg:p-5 glass-hover gradient-border">
+            <p class="text-slate-500 text-[10px] lg:text-xs uppercase tracking-wider font-bold">+70% Margen</p>
+            <p class="text-2xl lg:text-3xl font-black mt-2 text-purple-400" id="stat-ultra">0</p>
+          </div>
+          <div class="glass rounded-2xl p-4 lg:p-5 glass-hover gradient-border">
+            <p class="text-slate-500 text-[10px] lg:text-xs uppercase tracking-wider font-bold">Winners</p>
+            <p class="text-2xl lg:text-3xl font-black mt-2 text-accent-400" id="stat-winners">0</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+          <div class="glass rounded-2xl p-4 lg:p-6 flex flex-col gradient-border">
+            <h3 class="text-sm font-bold mb-4 text-slate-300 uppercase tracking-wider">Estado de Productos</h3>
+            <div class="relative flex-1" style="min-height: 220px;">
+              <canvas id="statusChart"></canvas>
+            </div>
+          </div>
+          <div class="lg:col-span-2 glass rounded-2xl p-4 lg:p-6 gradient-border">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">🏆 Top 5 Oportunidades</h3>
+              <button onclick="showTab('products')" class="text-xs text-brand-400 hover:text-brand-300 transition">Ver todos →</button>
+            </div>
+            <div id="top-opportunities" class="space-y-3">
+              <div class="shimmer rounded-xl h-16"></div>
+              <div class="shimmer rounded-xl h-16"></div>
+              <div class="shimmer rounded-xl h-16"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Hunter Banner -->
+        <div class="glass rounded-2xl p-6 lg:p-8 text-center border border-accent-500/20 bg-gradient-to-br from-accent-500/5 to-brand-500/5">
+          <div class="text-5xl mb-4">🤖</div>
+          <h3 class="text-xl lg:text-2xl font-bold mb-2">¿No sabés qué importar?</h3>
+          <p class="text-slate-400 mb-6 max-w-lg mx-auto text-sm lg:text-base">El Hunter analiza 69 nichos probados, calcula todos los escenarios de precio y te muestra solo los que realmente ganan plata.</p>
+          <button onclick="runHunter()" class="bg-accent-600 hover:bg-accent-500 text-white px-6 lg:px-8 py-3 rounded-xl font-bold text-base lg:text-lg transition inline-flex items-center gap-2 shadow-lg shadow-accent-600/20">
+            <span>🚀</span> Lanzar Hunter Ahora
+          </button>
+        </div>
+      </div>
+
+      <!-- HUNTER -->
+      <div id="tab-hunter" class="tab-content hidden space-y-6 lg:space-y-8">
+        <div class="glass rounded-2xl p-6 lg:p-10 text-center border border-accent-500/20 bg-gradient-to-br from-accent-500/5 to-brand-500/5">
+          <div class="w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-accent-500/20 to-brand-500/20 flex items-center justify-center text-4xl lg:text-5xl border border-accent-500/30">🤖</div>
+          <h3 class="text-2xl lg:text-3xl font-black mb-3">Product Hunter AI</h3>
+          <p class="text-slate-400 mb-6 lg:mb-8 max-w-xl mx-auto text-base lg:text-lg">Analizá URLs de AliExpress/1688, explorá nichos pre-calibrados, y calculá márgenes reales.</p>
+          <div class="flex justify-center gap-4 flex-wrap">
+            <button onclick="runHunter()" id="hunter-big-btn" class="bg-accent-600 hover:bg-accent-500 text-white px-8 lg:px-10 py-3 lg:py-4 rounded-2xl font-bold text-lg lg:text-xl transition inline-flex items-center gap-3 shadow-xl shadow-accent-600/20">
+              <span>🚀</span> Lanzar Hunter
+            </button>
+          </div>
+          <p class="text-xs text-slate-500 mt-4">Actualiza productos en "researching" con los 69 nichos pre-calibrados</p>
+        </div>
+
+        <!-- URL Analyzer -->
+        <div class="glass rounded-2xl p-6 gradient-border">
+          <h3 class="text-lg font-bold mb-4">🔗 Analizar URL de Producto</h3>
+          <p class="text-sm text-slate-400 mb-4">Pegá el link de AliExpress o 1688 y extraemos el precio, imagen y datos automáticamente.</p>
+          <div class="flex gap-3">
+            <input type="text" id="analyze-url-input" placeholder="https://www.aliexpress.com/item/..." 
+              class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+            <button onclick="analyzeURL()" class="bg-brand-600 hover:bg-brand-500 text-white px-6 py-3 rounded-xl font-bold transition">
+              Analizar
+            </button>
+          </div>
+          <div id="analyze-result" class="hidden mt-4"></div>
+        </div>
+
+        <!-- Trending Categories -->
+        <div>
+          <div class="flex flex-wrap items-center justify-between mb-4 gap-3">
+            <h3 class="text-lg font-bold">Product Hunter</h3>
+            <div class="flex items-center gap-3 flex-wrap">
+              <span id="hunter-page-info" class="text-xs text-slate-500 bg-slate-800 px-3 py-1 rounded-full">Cargando...</span>
+              <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+                <input type="checkbox" id="hunter-images-toggle" class="accent-brand-500" checked onchange="loadNiches(1)">
+                <span>Imágenes reales</span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- Search & Filters -->
+          <div class="glass rounded-xl p-4 mb-4 border border-slate-700/50">
+            <div class="flex flex-wrap gap-3 items-end">
+              <div class="flex-1 min-w-[200px]">
+                <label class="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1 block">Buscar producto</label>
+                <div class="flex gap-2">
+                  <input type="text" id="hunter-search" placeholder="Ej: auriculares, smartwatch, funda..." 
+                    class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                    onkeydown="if(event.key==='Enter'){loadNiches(1);return false;}">
+                  <button onclick="loadNiches(1)" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">🔍 Buscar</button>
+                  <button onclick="clearHunterSearch()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg text-sm transition">✕</button>
+                </div>
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1 block">Ordenar por</label>
+                <select id="hunter-sort" onchange="loadNiches(1)" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                  <option value="demand:desc">🔥 Demanda (alta)</option>
+                  <option value="demand:asc">Demanda (baja)</option>
+                  <option value="price:asc">💰 Precio (barato)</option>
+                  <option value="price:desc">Precio (caro)</option>
+                  <option value="margin:desc">📈 Margen (alto)</option>
+                  <option value="margin:asc">Margen (bajo)</option>
+                  <option value="rating:desc">⭐ Rating (alto)</option>
+                  <option value="reviews:desc">💬 Reviews (más)</option>
+                  <option value="name:asc">A-Z</option>
+                  <option value="name:desc">Z-A</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-3 mt-3">
+              <div class="flex items-center gap-2">
+<label class="text-[10px] text-slate-500 uppercase font-bold">Costo min USD</label>
+ <input type="number" id="hunter-min-cost" placeholder="0" min="0" step="1"
+ class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+ oninput="debounceHunterFilter()" onchange="loadNiches(1)">
+ </div>
+ <div class="flex items-center gap-2">
+ <label class="text-[10px] text-slate-500 uppercase font-bold">Costo max USD</label>
+ <input type="number" id="hunter-max-cost" placeholder="∞" min="0" step="1"
+ class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+ oninput="debounceHunterFilter()" onchange="loadNiches(1)">
+              </div>
+              <div class="flex items-center gap-2 ml-auto">
+                <span id="hunter-source-badge" class="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-400 hidden"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Pagination controls -->
+          <div id="hunter-pagination" class="flex items-center justify-between mb-4 hidden">
+            <button onclick="loadNiches(window.hunterPage - 1)" id="hunter-prev" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg font-semibold transition disabled:opacity-30 disabled:cursor-not-allowed">
+              ← Anterior
+            </button>
+            <span id="hunter-page-indicator" class="text-xs text-slate-500 font-medium">Página 1 de 7</span>
+            <button onclick="loadNiches(window.hunterPage + 1)" id="hunter-next" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg font-semibold transition disabled:opacity-30 disabled:cursor-not-allowed">
+              Siguiente →
+            </button>
+          </div>
+          
+          <div id="niches-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
+            <div class="shimmer rounded-2xl h-64"></div>
+            <div class="shimmer rounded-2xl h-64"></div>
+            <div class="shimmer rounded-2xl h-64"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUCTS -->
+      <div id="tab-products" class="tab-content hidden space-y-6">
+        <div class="flex flex-wrap gap-3 items-center justify-between">
+          <div class="flex gap-3 flex-wrap">
+            <select id="filter-status" onchange="loadProducts()" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 font-medium focus:border-brand-500 focus:outline-none">
+              <option value="">Todos los estados</option>
+              <option value="researching">🔍 Researching</option>
+              <option value="sourcing">🔎 Sourcing</option>
+              <option value="ordered">📋 Ordered</option>
+              <option value="in_transit">✈️ In Transit</option>
+              <option value="customs">🛃 Customs</option>
+              <option value="arrived">📦 Arrived</option>
+              <option value="testing">🧪 Testing</option>
+              <option value="listed">🏷️ Listed</option>
+              <option value="winner">🏆 Winner</option>
+              <option value="flop">❌ Flop</option>
+            </select>
+            <select id="filter-margin" onchange="loadProducts()" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 font-medium focus:border-brand-500 focus:outline-none">
+              <option value="0" selected>Cualquier margen</option>
+              <option value="50">+50% margen</option>
+              <option value="60">+60% margen (agresivo)</option>
+              <option value="66">+66% margen (luxury)</option>
+              <option value="75">+75% margen (extreme)</option>
+            </select>
+            <select id="filter-strategy" onchange="loadProducts()" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 font-medium focus:border-brand-500 focus:outline-none">
+              <option value="">Todas las estrategias</option>
+              <option value="cost_plus">Cost-Plus (50%)</option>
+              <option value="aggressive">Aggressive (60%)</option>
+              <option value="luxury">Luxury (66%)</option>
+              <option value="extreme">Extreme (75%)</option>
+              <option value="value">Value vs Comp</option>
+              <option value="premium_vs_comp">Premium vs Comp</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-3">
+            <button onclick="exportCSV()" class="text-xs text-slate-400 hover:text-white transition flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Exportar CSV
+            </button>
+            <p class="text-xs text-slate-500" id="products-count">Cargando...</p>
+          </div>
+        </div>
+        <div id="products-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+          <div class="shimmer rounded-2xl h-80"></div>
+          <div class="shimmer rounded-2xl h-80"></div>
+          <div class="shimmer rounded-2xl h-80"></div>
+        </div>
+      </div>
+
+      <!-- CALCULATOR -->
+      <div id="tab-calculator" class="tab-content hidden">
+        <div class="max-w-4xl mx-auto">
+          <div class="glass rounded-2xl p-6 lg:p-8 space-y-6 gradient-border">
+            <div class="text-center mb-4">
+              <h3 class="text-xl lg:text-2xl font-bold">Calculadora Multi-Estrategia</h3>
+              <p class="text-slate-400 text-sm mt-1">6 escenarios de pricing desde conservador hasta extremo</p>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">Costo producto (USD)</label>
+                <input type="number" id="calc-cost" value="12" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">Flete (USD)</label>
+                <input type="number" id="calc-shipping" value="3" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">Categoría / Arancel</label>
+                <select id="calc-tariff" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 font-medium focus:border-brand-500 focus:outline-none transition">
+                  <option value="0.10">Tecnología (10%)</option>
+                  <option value="0.12">Hogar (12%)</option>
+                  <option value="0.15">Electrónica (15%)</option>
+                  <option value="0.20">Moda (20%)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">Precio competencia ML (UYU)</label>
+                <input type="number" id="calc-comp" value="3200" step="50" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">Agente aduanero (USD)</label>
+                <input type="number" id="calc-agent" value="15" step="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1.5 font-medium">USD/UYU</label>
+                <input type="number" id="calc-rate" value="42" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+              </div>
+            </div>
+            <button onclick="runCalc()" class="w-full bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white py-3.5 rounded-xl font-bold text-lg transition shadow-lg shadow-brand-600/20">
+              Calcular Escenarios
+            </button>
+
+            <div id="calc-results" class="hidden space-y-6 pt-6 border-t border-slate-700">
+              <div class="bg-slate-800/50 rounded-xl p-5">
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Desglose de Costos</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div class="bg-slate-900/50 rounded-lg p-3">
+                    <p class="text-slate-500 text-xs">CIF</p>
+                    <p class="text-lg font-bold" id="res-cif">$0</p>
+                  </div>
+                  <div class="bg-slate-900/50 rounded-lg p-3">
+                    <p class="text-slate-500 text-xs">Arancel</p>
+                    <p class="text-lg font-bold text-gold-400" id="res-tariff">$0</p>
+                  </div>
+                  <div class="bg-slate-900/50 rounded-lg p-3">
+                    <p class="text-slate-500 text-xs">IVA (22%)</p>
+                    <p class="text-lg font-bold text-purple-400" id="res-iva">$0</p>
+                  </div>
+                  <div class="bg-slate-900/50 rounded-lg p-3">
+                    <p class="text-slate-500 text-xs">Tasa estadística</p>
+                    <p class="text-lg font-bold text-slate-300" id="res-stat">$0</p>
+                  </div>
+                </div>
+                <div class="mt-4 flex items-center justify-between bg-gradient-to-r from-brand-600/10 to-accent-600/10 rounded-xl p-4 border border-brand-500/20">
+                  <div>
+                    <p class="text-xs text-slate-400 font-medium">Costo total en tu depósito</p>
+                    <p class="text-3xl font-black text-brand-400 mt-1" id="res-total">$0 UYU</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs text-slate-500">Multiplicador</p>
+                    <p class="text-xl font-bold text-slate-300" id="res-mult">0x</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-4">Estrategias de Pricing</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div class="glass rounded-xl p-5 border-l-4 border-slate-500">
+                    <div class="flex justify-between items-start mb-2">
+                      <p class="text-xs font-bold text-slate-400 uppercase">Cost-Plus</p>
+                      <span class="strategy-tag strat-cost-plus">100% markup</span>
+                    </div>
+                    <p class="text-2xl font-black" id="res-price-cp">$0</p>
+                    <p class="text-sm mt-1" id="res-margin-cp">Margen: 50.0%</p>
+                    <p class="text-xs text-slate-500 mt-2">Precio = Costo x 2. Seguro pero conservador.</p>
+                  </div>
+                  <div class="glass rounded-xl p-5 border-l-4 border-brand-500">
+                    <div class="flex justify-between items-start mb-2">
+                      <p class="text-xs font-bold text-brand-400 uppercase">Aggressive</p>
+                      <span class="strategy-tag strat-aggressive">150% markup</span>
+                    </div>
+                    <p class="text-2xl font-black text-brand-400" id="res-price-ag">$0</p>
+                    <p class="text-sm mt-1" id="res-margin-ag">Margen: 60.0%</p>
+                    <p class="text-xs text-slate-500 mt-2">Precio = Costo x 2.5. Buen balance.</p>
+                  </div>
+                  <div class="glass rounded-xl p-5 border-l-4 border-purple-500">
+                    <div class="flex justify-between items-start mb-2">
+                      <p class="text-xs font-bold text-purple-400 uppercase">Luxury</p>
+                      <span class="strategy-tag strat-luxury">200% markup</span>
+                    </div>
+                    <p class="text-2xl font-black text-purple-400" id="res-price-lx">$0</p>
+                    <p class="text-sm mt-1" id="res-margin-lx">Margen: 66.7%</p>
+                    <p class="text-xs text-slate-500 mt-2">Precio = Costo x 3. Para productos premium.</p>
+                  </div>
+                  <div class="glass rounded-xl p-5 border-l-4 border-gold-500">
+                    <div class="flex justify-between items-start mb-2">
+                      <p class="text-xs font-bold text-gold-400 uppercase">Extreme</p>
+                      <span class="strategy-tag strat-extreme">300% markup</span>
+                    </div>
+                    <p class="text-2xl font-black text-gold-400" id="res-price-ex">$0</p>
+                    <p class="text-sm mt-1" id="res-margin-ex">Margen: 75.0%</p>
+                    <p class="text-xs text-slate-500 mt-2">Precio = Costo x 4. Solo si no hay competencia.</p>
+                  </div>
+                  <div class="glass rounded-xl p-5 border-l-4 border-accent-500">
+                    <div class="flex justify-between items-start mb-2">
+                      <p class="text-xs font-bold text-accent-400 uppercase">Value</p>
+                      <span class="strategy-tag strat-value">vs competencia</span>
+                    </div>
+                    <p class="text-2xl font-black text-accent-400" id="res-price-val">$0</p>
+                    <p class="text-sm mt-1" id="res-margin-val">Margen: 0%</p>
+                    <p class="text-xs text-slate-500 mt-2">95% del precio de ML. Competitivo.</p>
+                  </div>
+                  <div class="glass rounded-xl p-5 border-l-4 border-pink-500">
+                    <div class="flex justify-between items-start mb-2">
+                      <p class="text-xs font-bold text-pink-400 uppercase">Premium vs Comp</p>
+                      <span class="strategy-tag strat-premium">+20% vs ML</span>
+                    </div>
+                    <p class="text-2xl font-black text-pink-400" id="res-price-pr">$0</p>
+                    <p class="text-sm mt-1" id="res-margin-pr">Margen: 0%</p>
+                    <p class="text-xs text-slate-500 mt-2">120% del precio de ML. Marca fuerte.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-r from-accent-500/10 to-gold-500/10 rounded-xl p-5 border border-accent-500/20">
+                <p class="text-sm font-bold text-accent-400">🎯 Mejor estrategia recomendada: <span id="res-best-strat" class="text-white">-</span></p>
+                <p class="text-xs text-slate-400 mt-1">Basado en maximizar margen sin perder competitividad</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ML SEARCH -->
+      <div id="tab-mlsearch" class="tab-content hidden">
+        <div class="space-y-6">
+          <!-- Search Box -->
+          <div class="glass rounded-2xl p-6 lg:p-8 gradient-border">
+            <h3 class="text-xl font-bold mb-2">Buscar Competencia en MercadoLibre Uruguay</h3>
+            <p class="text-slate-400 text-sm mb-6">Conocé a tu competencia antes de importar. Análisis automático GO/CAUTION/AVOID.</p>
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+              <input type="text" id="ml-query" placeholder="Ej: auriculares bluetooth, smartwatch..." 
+                class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-5 py-3.5 text-sm font-medium focus:border-brand-500 focus:outline-none transition"
+                onkeypress="if(event.key==='Enter')searchML()">
+              <input type="number" id="ml-landed-cost" placeholder="Tu costo landed (UYU) — opcional" 
+                class="sm:w-56 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3.5 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+              <button onclick="searchML()" class="bg-brand-600 hover:bg-brand-500 text-white px-6 lg:px-8 py-3.5 rounded-xl font-bold transition shadow-lg shadow-brand-600/20 whitespace-nowrap">
+                Analizar
+              </button>
+            </div>
+          </div>
+
+          <!-- Analysis Result -->
+          <div id="ml-analysis" class="hidden"></div>
+
+          <!-- Summary Cards -->
+          <div id="ml-summary" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+
+          <!-- Results List -->
+          <div id="ml-results" class="space-y-3">
+            <div class="empty-state py-12">
+              <div class="empty-state-icon">🔍</div>
+              <p class="text-slate-500">Ingresá un producto para ver análisis de competencia en Uruguay.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+          <!-- TRACKING -->
+          <div id="tab-tracking" class="tab-content hidden space-y-6">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xl font-bold">Envios y Seguimiento</h3>
+              <button onclick="openShipmentModal()" class="bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition">+ Nuevo Envio</button>
+            </div>
+            <div id="shipments-list" class="space-y-4">
+              <div class="empty-state py-12">
+                <div class="empty-state-icon">📦</div>
+                <p class="text-slate-500">No hay envios registrados</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- MARKETING -->
+          <div id="tab-marketing" class="tab-content hidden space-y-6">
+            <!-- Dashboard Header -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="glass rounded-xl p-4 text-center">
+                <p class="text-[10px] text-slate-500 uppercase font-bold">Campañas</p>
+                <p class="text-2xl font-black text-white" id="m-total-campaigns">-</p>
+              </div>
+              <div class="glass rounded-xl p-4 text-center">
+                <p class="text-[10px] text-slate-500 uppercase font-bold">Activas</p>
+                <p class="text-2xl font-black text-accent-400" id="m-active-campaigns">-</p>
+              </div>
+              <div class="glass rounded-xl p-4 text-center">
+                <p class="text-[10px] text-slate-500 uppercase font-bold">Productos Ready</p>
+                <p class="text-2xl font-black text-brand-400" id="m-ready-products">-</p>
+              </div>
+              <div class="glass rounded-xl p-4 text-center">
+                <p class="text-[10px] text-slate-500 uppercase font-bold">Budget Mes</p>
+                <p class="text-2xl font-black text-gold-400" id="m-budget">-</p>
+              </div>
+            </div>
+
+            <!-- Tools Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Listing Optimizer -->
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center text-xl">🏷️</div>
+                  <div>
+                    <h4 class="font-bold text-sm">Optimizar Listing ML</h4>
+                    <p class="text-xs text-slate-500">Titulo, descripcion y keywords</p>
+                  </div>
+                </div>
+                <select id="m-listing-product" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm mb-3">
+                  <option value="">Seleccionar producto...</option>
+                </select>
+                <select id="m-listing-strategy" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm mb-3">
+                  <option value="aggressive">Aggressive (60%)</option>
+                  <option value="luxury">Luxury (66%)</option>
+                  <option value="extreme">Extreme (75%)</option>
+                  <option value="value">Value vs Comp</option>
+                </select>
+                <button onclick="generateListing()" class="w-full bg-brand-600 hover:bg-brand-500 text-white py-2.5 rounded-xl text-sm font-bold transition">Generar Listing</button>
+                <div id="m-listing-result" class="hidden mt-4 space-y-3"></div>
+                <!-- AI Image for Listing -->
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <p class="text-xs font-bold text-slate-300 mb-2">🎨 Diseño Grafico</p>
+                  <div class="flex gap-2 mb-2">
+                    <select id="m-listing-img-design" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="product_photo">Foto Real</option>
+                      <option value="banner" selected>Banner</option>
+                      <option value="mockup">Mockup</option>
+                      <option value="social_card">Tarjeta</option>
+                      <option value="flyer">Flyer</option>
+                      <option value="hero">Hero</option>
+                    </select>
+                    <select id="m-listing-img-style" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="modern">Moderno</option>
+                      <option value="lifestyle">Lifestyle</option>
+                      <option value="minimal">Minimal</option>
+                      <option value="bold">Bold</option>
+                      <option value="unboxing">Unboxing</option>
+                    </select>
+                  </div>
+                  <div class="flex gap-2 mb-2">
+                    <select id="m-listing-img-usage" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="listing">Listing</option>
+                      <option value="feed">Feed</option>
+                      <option value="ad">Anuncio</option>
+                    </select>
+                  </div>
+                  <button onclick="generateQuickImage(document.getElementById('m-listing-product').value, 'm-listing')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-1.5 rounded-lg text-xs font-bold transition">Generar Diseño</button>
+                  <div id="m-listing-img-result" class="hidden mt-2">
+                    <div class="relative rounded-lg overflow-hidden bg-slate-900">
+                      <img id="m-listing-img-el" src="" class="w-full h-48 object-cover opacity-0 transition-opacity duration-500">
+                      <div id="m-listing-img-spinner" class="absolute inset-0 flex items-center justify-center bg-slate-900 z-10"><div class="spinner"></div></div>
+                      <div id="m-listing-img-fallback" class="hidden absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
+                        <div class="text-center px-4">
+                          <p class="text-amber-400 text-xs font-bold mb-1">Generando...</p>
+                          <p class="text-slate-500 text-[10px]">Pollinations.ai tarda la primera vez.</p>
+                          <a id="m-listing-img-fallback-link" href="" target="_blank" class="inline-block mt-2 bg-brand-600 text-white px-3 py-1 rounded text-[10px] font-bold">Abrir</a>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1" id="m-listing-img-prompt"></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Social Content -->
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="w-10 h-10 rounded-lg bg-accent-500/20 flex items-center justify-center text-xl">📱</div>
+                  <div>
+                    <h4 class="font-bold text-sm">Contenido Social</h4>
+                    <p class="text-xs text-slate-500">Posts listos para redes</p>
+                  </div>
+                </div>
+                <select id="m-social-product" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm mb-3">
+                  <option value="">Seleccionar producto...</option>
+                </select>
+                <div class="flex gap-2 mb-3">
+                  <button onclick="generateSocial('instagram')" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">Instagram</button>
+                  <button onclick="generateSocial('x')" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">X</button>
+                  <button onclick="generateSocial('tiktok')" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">TikTok</button>
+                </div>
+                <div id="m-social-result" class="hidden mt-4 space-y-3"></div>
+                <!-- AI Image for Social -->
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <p class="text-xs font-bold text-slate-300 mb-2">🎨 Diseño Grafico</p>
+                  <div class="flex gap-2 mb-2">
+                    <select id="m-social-img-design" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="product_photo">Foto Real</option>
+                      <option value="social_card" selected>Tarjeta Social</option>
+                      <option value="banner">Banner</option>
+                      <option value="mockup">Mockup</option>
+                      <option value="flyer">Flyer</option>
+                      <option value="hero">Hero</option>
+                    </select>
+                    <select id="m-social-img-style" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="modern">Moderno</option>
+                      <option value="lifestyle">Lifestyle</option>
+                      <option value="minimal">Minimal</option>
+                      <option value="bold">Bold</option>
+                      <option value="unboxing">Unboxing</option>
+                    </select>
+                  </div>
+                  <div class="flex gap-2 mb-2">
+                    <select id="m-social-img-usage" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="feed">Feed</option>
+                      <option value="story">Stories</option>
+                      <option value="reel">Reel</option>
+                      <option value="ad">Anuncio</option>
+                    </select>
+                  </div>
+                  <button onclick="generateQuickImage(document.getElementById('m-social-product').value, 'm-social')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-1.5 rounded-lg text-xs font-bold transition">Generar Diseño</button>
+                  <div id="m-social-img-result" class="hidden mt-2">
+                    <div class="relative rounded-lg overflow-hidden bg-slate-900">
+                      <img id="m-social-img-el" src="" class="w-full h-48 object-cover opacity-0 transition-opacity duration-500">
+                      <div id="m-social-img-spinner" class="absolute inset-0 flex items-center justify-center bg-slate-900 z-10"><div class="spinner"></div></div>
+                      <div id="m-social-img-fallback" class="hidden absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
+                        <div class="text-center px-4">
+                          <p class="text-amber-400 text-xs font-bold mb-1">Generando...</p>
+                          <p class="text-slate-500 text-[10px]">Pollinations.ai tarda la primera vez.</p>
+                          <a id="m-social-img-fallback-link" href="" target="_blank" class="inline-block mt-2 bg-brand-600 text-white px-3 py-1 rounded text-[10px] font-bold">Abrir</a>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1" id="m-social-img-prompt"></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Email Campaign -->
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="w-10 h-10 rounded-lg bg-gold-500/20 flex items-center justify-center text-xl">📧</div>
+                  <div>
+                    <h4 class="font-bold text-sm">Email Marketing</h4>
+                    <p class="text-xs text-slate-500">Campañas HTML profesionales</p>
+                  </div>
+                </div>
+                <select id="m-email-product" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm mb-3">
+                  <option value="">Seleccionar producto...</option>
+                </select>
+                <select id="m-email-type" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm mb-3">
+                  <option value="launch">🚀 Lanzamiento</option>
+                  <option value="discount">🔥 Descuento</option>
+                  <option value="restock">📦 Restock</option>
+                  <option value="seasonal">🎁 Temporada</option>
+                </select>
+                <button onclick="generateEmail()" class="w-full bg-gold-600 hover:bg-gold-500 text-white py-2.5 rounded-xl text-sm font-bold transition">Generar Email</button>
+                <div id="m-email-result" class="hidden mt-4 space-y-3"></div>
+                <!-- AI Image for Email -->
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <p class="text-xs font-bold text-slate-300 mb-2">🎨 Diseño Grafico</p>
+                  <div class="flex gap-2 mb-2">
+                    <select id="m-email-img-design" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="product_photo">Foto Real</option>
+                      <option value="banner" selected>Banner</option>
+                      <option value="hero">Hero</option>
+                      <option value="mockup">Mockup</option>
+                      <option value="social_card">Tarjeta</option>
+                      <option value="flyer">Flyer</option>
+                    </select>
+                    <select id="m-email-img-style" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="modern">Moderno</option>
+                      <option value="lifestyle">Lifestyle</option>
+                      <option value="minimal">Minimal</option>
+                      <option value="bold">Bold</option>
+                      <option value="unboxing">Unboxing</option>
+                    </select>
+                  </div>
+                  <div class="flex gap-2 mb-2">
+                    <select id="m-email-img-usage" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-[11px]">
+                      <option value="email">Email Header</option>
+                      <option value="feed">Feed</option>
+                      <option value="ad">Anuncio</option>
+                    </select>
+                  </div>
+                  <button onclick="generateQuickImage(document.getElementById('m-email-product').value, 'm-email')" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-1.5 rounded-lg text-xs font-bold transition">Generar Diseño</button>
+                  <div id="m-email-img-result" class="hidden mt-2">
+                    <div class="relative rounded-lg overflow-hidden bg-slate-900">
+                      <img id="m-email-img-el" src="" class="w-full h-48 object-cover opacity-0 transition-opacity duration-500">
+                      <div id="m-email-img-spinner" class="absolute inset-0 flex items-center justify-center bg-slate-900 z-10"><div class="spinner"></div></div>
+                      <div id="m-email-img-fallback" class="hidden absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
+                        <div class="text-center px-4">
+                          <p class="text-amber-400 text-xs font-bold mb-1">Generando...</p>
+                          <p class="text-slate-500 text-[10px]">Pollinations.ai tarda la primera vez.</p>
+                          <a id="m-email-img-fallback-link" href="" target="_blank" class="inline-block mt-2 bg-brand-600 text-white px-3 py-1 rounded text-[10px] font-bold">Abrir</a>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1" id="m-email-img-prompt"></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Strategy -->
+              <div class="glass rounded-xl p-5">
+                <div class="flex items-center gap-3 mb-4">
+                  <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-xl">🎯</div>
+                  <div>
+                    <h4 class="font-bold text-sm">Estrategia Completa</h4>
+                    <p class="text-xs text-slate-500">Plan de 30 dias con KPIs</p>
+                  </div>
+                </div>
+                <select id="m-strategy-product" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm mb-3">
+                  <option value="">Seleccionar producto...</option>
+                </select>
+                <button onclick="generateStrategy()" class="w-full bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-xl text-sm font-bold transition">Generar Estrategia</button>
+                <div id="m-strategy-result" class="hidden mt-4 space-y-3"></div>
+              </div>
+            </div>
+
+            <!-- Campaigns List -->
+            <div class="glass rounded-xl p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="font-bold text-sm">📋 Campañas Guardadas</h4>
+                <button onclick="loadCampaigns()" class="text-xs text-brand-400 hover:text-brand-300 font-medium">Recargar</button>
+              </div>
+              <div id="m-campaigns-list" class="space-y-2">
+                <p class="text-sm text-slate-500 text-center py-8">No hay campañas guardadas aun</p>
+              </div>
+            </div>
+          </div>
+
+  </main>
+</div>
+
+<!-- ADD PRODUCT MODAL -->
+<div id="add-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto modal-enter">
+    <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+      <h3 class="font-bold text-lg">Agregar Producto</h3>
+      <button onclick="closeAddModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input id="p-name" placeholder="Nombre del producto" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+      <select id="p-category" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 font-medium focus:border-brand-500 focus:outline-none transition">
+        <option value="tecnologia">Tecnología (10% arancel)</option>
+        <option value="hogar_inteligente">Hogar Inteligente (12%)</option>
+        <option value="electronica">Electrónica (15%)</option>
+        <option value="bienestar">Bienestar (10%)</option>
+        <option value="accesorios_auto">Accesorios Auto (15%)</option>
+        <option value="mascotas">Mascotas (10%)</option>
+        <option value="herramientas">Herramientas (15%)</option>
+        <option value="moda_accesorios">Moda/Accesorios (20%)</option>
+      </select>
+      <input id="p-source" placeholder="URL fuente (AliExpress/1688)" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+      <input id="p-image" placeholder="URL imagen" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+      <div class="grid grid-cols-2 gap-3">
+        <input type="number" id="p-cost" placeholder="Costo producto USD" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+        <input type="number" id="p-shipping" placeholder="Flete USD" step="0.5" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+      </div>
+      <input type="number" id="p-ml-price" placeholder="Precio competencia ML UYU" step="50" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition">
+      <select id="p-status" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 font-medium focus:border-brand-500 focus:outline-none">
+        <option value="researching">🔍 Researching</option>
+        <option value="sourcing">🔎 Sourcing</option>
+        <option value="ordered">📋 Ordered</option>
+        <option value="in_transit">✈️ In Transit</option>
+        <option value="customs">🛃 Customs</option>
+        <option value="arrived">📦 Arrived</option>
+        <option value="testing">🧪 Testing</option>
+        <option value="listed">🏷️ Listed</option>
+        <option value="winner">🏆 Winner</option>
+        <option value="flop">❌ Flop</option>
+      </select>
+      <textarea id="p-notes" placeholder="Notas..." rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:border-brand-500 focus:outline-none transition"></textarea>
+      <button onclick="submitProduct()" class="w-full bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white py-3.5 rounded-xl font-bold text-lg transition shadow-lg shadow-brand-600/20">
+        Guardar Producto
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCT ANALYSIS MODAL -->
+<div id="analysis-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto modal-enter">
+    <div class="p-5 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+      <div>
+        <h3 class="font-bold text-lg" id="analysis-title">Análisis de Producto</h3>
+        <p class="text-xs text-slate-500" id="analysis-subtitle">Cargando...</p>
+      </div>
+      <button onclick="closeAnalysisModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+    </div>
+    
+    <div id="analysis-loading" class="p-12 text-center">
+      <div class="spinner mx-auto mb-4"></div>
+      <p class="text-sm text-slate-400">Analizando proyecciones, break-even y riesgos...</p>
+    </div>
+    
+    <div id="analysis-content" class="hidden">
+      <!-- Tabs -->
+      <div class="flex border-b border-slate-800 px-5 pt-4 gap-1">
+        <button onclick="switchAnalysisTab('overview')" id="tab-btn-overview" class="analysis-tab px-4 py-2 text-sm font-semibold rounded-t-lg bg-brand-600/10 text-brand-400 border border-brand-600/20 border-b-0">Resumen</button>
+        <button onclick="switchAnalysisTab('projections')" id="tab-btn-projections" class="analysis-tab px-4 py-2 text-sm font-medium rounded-t-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">Proyecciones</button>
+        <button onclick="switchAnalysisTab('inventory')" id="tab-btn-inventory" class="analysis-tab px-4 py-2 text-sm font-medium rounded-t-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">Inventario</button>
+      </div>
+      
+      <!-- Tab: Overview -->
+      <div id="analysis-tab-overview" class="p-5 space-y-5">
+        <!-- Key Metrics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="glass rounded-xl p-4 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Costo Landed</p>
+            <p class="text-xl font-black text-white" id="a-landed">-</p>
+          </div>
+          <div class="glass rounded-xl p-4 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Precio Venta</p>
+            <p class="text-xl font-black text-brand-400" id="a-price">-</p>
+          </div>
+          <div class="glass rounded-xl p-4 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Margen</p>
+            <p class="text-xl font-black text-accent-400" id="a-margin">-</p>
+          </div>
+          <div class="glass rounded-xl p-4 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Ganancia/u</p>
+            <p class="text-xl font-black text-gold-400" id="a-profit">-</p>
+          </div>
+        </div>
+        
+        <!-- Break-even -->
+        <div class="glass rounded-xl p-5">
+          <h4 class="font-bold text-sm mb-3 flex items-center gap-2">📈 Break-even</h4>
+          <div class="flex items-center gap-4 mb-3">
+            <div class="flex-1">
+              <p class="text-xs text-slate-500">Inversión inicial (20 unidades + agente)</p>
+              <p class="text-lg font-bold text-white" id="a-investment">-</p>
+            </div>
+            <div class="text-2xl text-slate-600">→</div>
+            <div class="flex-1">
+              <p class="text-xs text-slate-500">Unidades para recuperar</p>
+              <p class="text-lg font-bold text-accent-400" id="a-breakeven">-</p>
+            </div>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+            <div id="a-be-bar" class="bg-gradient-to-r from-brand-500 to-accent-500 h-full rounded-full transition-all duration-1000" style="width: 0%"></div>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Break-even al mes <span id="a-be-month" class="text-white font-bold">-</span> (escenario conservador)</p>
+        </div>
+        
+        <!-- Risk Score -->
+        <div class="glass rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-bold text-sm">🎯 Risk Score</h4>
+            <span id="a-risk-badge" class="text-xs font-bold px-3 py-1 rounded-full">-</span>
+          </div>
+          <div class="space-y-2" id="a-risk-factors">
+            <!-- Risk factors injected here -->
+          </div>
+        </div>
+        
+        <!-- AI Insights -->
+        <div class="glass rounded-xl p-5 border border-brand-500/20">
+          <h4 class="font-bold text-sm mb-3 flex items-center gap-2">💡 Insights</h4>
+          <div id="a-insights" class="space-y-2">
+            <!-- Insights injected here -->
+          </div>
+        </div>
+        
+        <!-- Annual ROI -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="glass rounded-xl p-4 bg-slate-800/50">
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">ROI Anual (Conservador)</p>
+            <p class="text-2xl font-black text-slate-300" id="a-roi-cons">-</p>
+            <p class="text-xs text-slate-500 mt-1">Ganancia: <span id="a-profit-cons">-</span></p>
+          </div>
+          <div class="glass rounded-xl p-4 bg-brand-500/5 border border-brand-500/20">
+            <p class="text-[10px] text-brand-400 uppercase font-bold mb-1">ROI Anual (Optimista)</p>
+            <p class="text-2xl font-black text-brand-400" id="a-roi-opt">-</p>
+            <p class="text-xs text-slate-500 mt-1">Ganancia: <span id="a-profit-opt">-</span></p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Tab: Projections -->
+      <div id="analysis-tab-projections" class="hidden p-5 space-y-5">
+        <div class="glass rounded-xl p-5">
+          <h4 class="font-bold text-sm mb-4">📊 Proyección de Ganancias Acumuladas (12 meses)</h4>
+          <div class="relative h-48 flex items-end gap-1 px-2" id="a-chart-container">
+            <!-- Mini bar chart injected here -->
+          </div>
+          <div class="flex justify-center gap-6 mt-3 text-xs">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-600"></span> Conservador</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-brand-500"></span> Optimista</span>
+          </div>
+        </div>
+        
+        <div class="glass rounded-xl p-5 overflow-x-auto">
+          <h4 class="font-bold text-sm mb-3">📋 Detalle Mensual</h4>
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-slate-500 border-b border-slate-800">
+                <th class="text-left py-2 px-2">Mes</th>
+                <th class="text-right py-2 px-2">Unid.</th>
+                <th class="text-right py-2 px-2">Ingreso</th>
+                <th class="text-right py-2 px-2">Ganancia</th>
+                <th class="text-right py-2 px-2">Acum.</th>
+              </tr>
+            </thead>
+            <tbody id="a-projection-table">
+              <!-- Rows injected here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Tab: Inventory -->
+      <div id="analysis-tab-inventory" class="hidden p-5 space-y-5">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="glass rounded-xl p-4 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Primera Compra Sugerida</p>
+            <p class="text-3xl font-black text-white" id="a-order-qty">-</p>
+            <p class="text-xs text-slate-500">unidades</p>
+          </div>
+          <div class="glass rounded-xl p-4 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Punto de Reorden</p>
+            <p class="text-3xl font-black text-gold-400" id="a-reorder">-</p>
+            <p class="text-xs text-slate-500">unidades</p>
+          </div>
+        </div>
+        
+        <div class="glass rounded-xl p-5">
+          <h4 class="font-bold text-sm mb-3">💰 Costo de Inventario</h4>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm text-slate-400">Inversión en stock inicial</span>
+            <span class="text-lg font-bold text-white" id="a-inventory-cost">-</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+            <div class="bg-gradient-to-r from-gold-500 to-brand-500 h-full rounded-full" style="width: 100%"></div>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">Con <span id="a-order-qty-2">-</span> unidades y un costo landed de <span id="a-landed-2">-</span> por unidad</p>
+        </div>
+        
+        <div class="glass rounded-xl p-5">
+          <h4 class="font-bold text-sm mb-3">📐 Comparación de Precios vs Competencia</h4>
+          <div id="a-pricing-comparison" class="space-y-2">
+            <!-- Pricing comparison bars injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CAMPAIGN VIEW MODAL -->
+<div id="campaign-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto modal-enter">
+    <div class="p-5 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+      <div>
+        <h3 class="font-bold text-lg" id="campaign-title">Campaña</h3>
+        <p class="text-xs text-slate-500" id="campaign-subtitle">-</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="deleteCampaign(currentCampaignId)" class="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-500/10 transition" title="Borrar campaña">🗑 Borrar</button>
+        <button onclick="closeCampaignModal()" class="text-slate-400 hover:text-white text-2xl px-2">&times;</button>
+      </div>
+    </div>
+    <div id="campaign-loading" class="p-12 text-center">
+      <div class="spinner mx-auto mb-4"></div>
+      <p class="text-sm text-slate-400">Cargando campaña...</p>
+    </div>
+    <div id="campaign-content" class="hidden p-5 space-y-4">
+      <!-- Product Image -->
+      <div class="flex items-center gap-4 p-3 bg-slate-800/50 rounded-xl">
+        <img id="campaign-product-img" src="" class="w-16 h-16 rounded-lg object-cover bg-slate-800" onerror="this.style.display='none'">
+        <div class="flex-1">
+          <p class="text-xs text-slate-500">Producto</p>
+          <p class="text-sm font-bold text-white" id="campaign-product-name">-</p>
+        </div>
+      </div>
+      
+      <!-- AI Image Generator -->
+      <div class="bg-slate-800/50 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-bold">🎨 Diseño Grafico para E-commerce</h4>
+          <button onclick="generateCampaignImage()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition">Generar</button>
+        </div>
+        <div class="flex gap-2 mb-3">
+          <select id="campaign-image-design" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+            <option value="product_photo">Foto Real del Producto</option>
+            <option value="banner">Banner E-commerce</option>
+            <option value="mockup">Mockup Lifestyle</option>
+            <option value="social_card">Tarjeta Social</option>
+            <option value="flyer">Flyer Promocional</option>
+            <option value="hero">Hero Landing Page</option>
+          </select>
+          <select id="campaign-image-style" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+            <option value="modern">Moderno</option>
+            <option value="lifestyle">Lifestyle</option>
+            <option value="minimal">Minimalista</option>
+            <option value="bold">Bold</option>
+            <option value="unboxing">Unboxing</option>
+          </select>
+        </div>
+        <div class="flex gap-2 mb-3">
+          <select id="campaign-image-usage" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+            <option value="feed">Feed Instagram</option>
+            <option value="story">Stories</option>
+            <option value="ad">Anuncio Ads</option>
+            <option value="listing">Listing</option>
+            <option value="email">Email</option>
+            <option value="reel">Reel/TikTok</option>
+          </select>
+        </div>
+        <div id="campaign-image-result" class="hidden mt-4">
+          <div class="relative rounded-lg overflow-hidden bg-slate-900">
+            <img id="campaign-generated-img" src="" class="w-full h-80 object-cover opacity-0 transition-opacity duration-500 cursor-pointer" onclick="window.open(this.src, '_blank')">
+            <div id="campaign-img-spinner" class="absolute inset-0 flex items-center justify-center bg-slate-900 z-10">
+              <div class="spinner"></div>
+            </div>
+            <div id="campaign-img-fallback" class="hidden absolute inset-0 flex items-center justify-center bg-slate-900 z-20">
+              <div class="text-center px-4">
+                <p class="text-amber-400 text-sm font-bold mb-2">La imagen se esta generando...</p>
+                <p class="text-slate-500 text-xs">Pollinations.ai tarda 15-30 segundos la primera vez.</p>
+                <p class="text-slate-500 text-xs">Espera un momento o abrila en nueva pestaña.</p>
+                <a id="campaign-img-fallback-link" href="" target="_blank" class="inline-block mt-3 bg-brand-600 hover:bg-brand-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition">Abrir imagen en nueva pestaña</a>
+              </div>
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-500 mt-2" id="campaign-image-prompt"></p>
+          <div class="flex gap-2 mt-2">
+            <button onclick="downloadCampaignImage()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-1.5 rounded-lg text-xs font-semibold transition">Descargar</button>
+            <button onclick="copyCampaignImageUrl()" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-1.5 rounded-lg text-xs font-semibold transition">Copiar URL</button>
+            <a id="campaign-img-view-link" href="" target="_blank" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-1.5 rounded-lg text-xs font-semibold transition text-center">Ver Completo</a>
+          </div>
+        </div>
+      </div>
+      
+      <div id="campaign-body" class="space-y-3"></div>
+      <div class="flex gap-2 pt-3 border-t border-slate-800">
+        <button onclick="copyCampaignContent()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm font-semibold transition">Copiar Contenido</button>
+        <button onclick="closeCampaignModal()" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2.5 rounded-lg text-sm font-semibold transition">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://uy-import-ops.onrender.com/api';
+let statusChart = null;
+let currentProducts = [];
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+function showToast(message, type = 'info', duration = 4000) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add('toast-exit');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DARK MODE
+// ═══════════════════════════════════════════════════════════════
+function toggleDarkMode() {
+  const html = document.documentElement;
+  const icon = document.getElementById('theme-icon');
+  if (html.classList.contains('dark')) {
+    html.classList.remove('dark');
+    html.classList.add('light-mode');
+    icon.textContent = '☀️';
+    localStorage.setItem('theme', 'light');
+  } else {
+    html.classList.add('dark');
+    html.classList.remove('light-mode');
+    icon.textContent = '🌙';
+    localStorage.setItem('theme', 'dark');
+  }
+}
+
+// Load saved theme
+const savedTheme = localStorage.getItem('theme') || 'dark';
+if (savedTheme === 'light') {
+  document.documentElement.classList.remove('dark');
+  document.documentElement.classList.add('light-mode');
+  document.getElementById('theme-icon').textContent = '☀️';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  // Ctrl/Cmd + K = Search
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('global-search').focus();
+  }
+  // Ctrl/Cmd + N = Add Product
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+    e.preventDefault();
+    openAddModal();
+  }
+ // 1-7 = Switch tabs (only if NOT typing in an input)
+ if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+ const active = document.activeElement;
+ const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA');
+ if (!isTyping) {
+ const tabs = ['dashboard', 'hunter', 'products', 'calculator', 'mlsearch', 'tracking', 'marketing'];
+ const num = parseInt(e.key);
+ if (num >= 1 && num <= 7) {
+ showTab(tabs[num - 1]);
+ }
+ }
+ }
+  // Escape = Close modal
+  if (e.key === 'Escape') {
+    closeAddModal();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GLOBAL SEARCH
+// ═══════════════════════════════════════════════════════════════
+function globalSearch() {
+  const query = document.getElementById('global-search').value.trim();
+  if (!query) return;
+  showTab('products');
+  document.getElementById('filter-status').value = '';
+  loadProducts(query);
+  showToast(`Buscando: "${query}"`, 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(el => {
+    el.classList.remove('bg-brand-600/10','text-brand-400','border','border-brand-600/20');
+    el.classList.add('text-slate-400');
+  });
+  const active = document.getElementById('nav-' + name);
+  active.classList.remove('text-slate-400');
+  active.classList.add('bg-brand-600/10','text-brand-400','border','border-brand-600/20');
+  document.getElementById('page-title').textContent = {
+    dashboard: 'Dashboard', hunter: 'Product Hunter', products: 'Productos', calculator: 'Calculadora', mlsearch: 'ML Uruguay', tracking: 'Seguimiento', marketing: 'Marketing'
+  }[name];
+  document.getElementById('page-subtitle').textContent = {
+    dashboard: 'Resumen de tu operación de importación',
+    hunter: 'Descubrí productos ganadores automáticamente',
+    products: 'Gestioná tu pipeline de productos',
+    calculator: 'Calculá márgenes con 6 estrategias',
+    mlsearch: 'Analizá la competencia en Uruguay',
+    tracking: 'Seguí tus envíos desde China a Uruguay',
+    marketing: 'Automatizá ventas, listing y campañas'
+  }[name];
+  if (name === 'dashboard') loadStats();
+  if (name === 'products') loadProducts();
+  if (name === 'hunter') loadNiches();
+  if (name === 'tracking') loadShipments();
+  if (name === 'marketing') loadMarketing();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+async function loadStats() {
+  try {
+    const r = await fetch(API + '/stats');
+    const d = await r.json();
+    animateNumber('stat-total', d.total_products);
+    animateNumber('stat-margin', d.avg_best_margin, '%');
+    animateNumber('stat-high', d.high_margin_products);
+    animateNumber('stat-ultra', d.ultra_margin_products);
+    animateNumber('stat-winners', d.by_status.winner || 0);
+    renderStatusChart(d.by_status);
+    loadTopOpportunities();
+  } catch(e) { 
+    console.error(e);
+    showToast('Error cargando estadísticas', 'error');
+  }
+}
+
+function animateNumber(id, value, suffix = '') {
+  const el = document.getElementById(id);
+  const target = parseFloat(value) || 0;
+  const duration = 800;
+  const start = performance.now();
+  
+  function update(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(target * eased);
+    el.textContent = current + suffix;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+function renderStatusChart(data) {
+  const ctx = document.getElementById('statusChart').getContext('2d');
+  if (statusChart) statusChart.destroy();
+  statusChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Researching','Sourcing','Ordered','In Transit','Customs','Arrived','Testing','Listed','Winner','Flop'],
+      datasets: [{
+        data: [
+          data.researching||0, data.sourcing||0, data.ordered||0, 
+          data.in_transit||0, data.customs||0, data.arrived||0,
+          data.testing||0, data.listed||0, data.winner||0, data.flop||0
+        ],
+        backgroundColor: ['#64748b','#818cf8','#c084fc','#38bdf8','#fbbf24','#4ade80','#a78bfa','#f472b6','#22c55e','#f87171'],
+        borderWidth: 0
+      }]
+    },
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false,
+      layout: { padding: 10 },
+      plugins: { 
+        legend: { 
+          position: 'right', 
+          labels: { color: '#94a3b8', boxWidth: 10, font: { size: 9 }, padding: 8 } 
+        } 
+      } 
+    }
+  });
+}
+
+async function loadTopOpportunities() {
+  try {
+    const r = await fetch(API + '/products?limit=5&min_margin=60');
+    const products = await r.json();
+    const container = document.getElementById('top-opportunities');
+    if (products.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state py-8">
+          <div class="empty-state-icon text-3xl">📦</div>
+          <p class="text-slate-500 text-sm">No hay productos con +60% margen todavía.</p>
+        </div>`;
+      return;
+    }
+    container.innerHTML = products.map((p, i) => `
+      <div class="flex items-center justify-between p-4 glass rounded-xl hover:bg-slate-800/50 transition cursor-pointer" onclick="showTab('products')" style="animation: slideUp 0.3s ease-out ${i * 0.05}s both;">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-500/20 to-accent-500/20 flex items-center justify-center text-lg">🏆</div>
+          <div>
+            <p class="text-sm font-semibold">${p.name}</p>
+            <p class="text-xs text-slate-500">${p.best_strategy.replace('_', ' ')} · $${Math.round(p.total_landed_cost_uyu)} landed</p>
+          </div>
+        </div>
+        <span class="margin-badge ${p.best_margin >= 70 ? 'margin-great' : p.best_margin >= 60 ? 'margin-good' : 'margin-ok'}">${p.best_margin}%</span>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HUNTER
+// ═══════════════════════════════════════════════════════════════
+async function runHunter() {
+  // Just reload the hunter view — products are discovered, not auto-saved
+  showTab('hunter');
+  loadNiches(1);
+  showToast('🤖 Hunter recargado — 69 productos disponibles', 'success', 2000);
+}
+
+async function analyzeURL() {
+  const url = document.getElementById('analyze-url-input').value.trim();
+  if (!url) {
+    showToast('Pegá una URL primero', 'error');
+    return;
+  }
+  
+  const resultDiv = document.getElementById('analyze-result');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = '<div class="flex items-center gap-3"><div class="spinner"></div><span class="text-sm text-slate-400">Analizando...</span></div>';
+  
+  try {
+    const r = await fetch(API + '/hunter/analyze-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await r.json();
+    
+    if (data.error) {
+      resultDiv.innerHTML = `<p class="text-danger-400 text-sm">❌ ${data.error}</p>`;
+      return;
+    }
+    
+    resultDiv.innerHTML = `
+      <div class="glass rounded-xl p-4 border border-brand-500/20">
+        <div class="flex gap-4">
+          <img src="${data.image_url || 'https://via.placeholder.com/120'}" class="w-24 h-24 object-cover rounded-lg">
+          <div class="flex-1">
+            <h4 class="font-bold text-sm mb-1">${data.name}</h4>
+            <p class="text-2xl font-black text-brand-400">$${data.price_usd} <span class="text-xs font-normal text-slate-500">USD</span></p>
+            <p class="text-xs text-slate-500 mt-1">Fuente: ${data.source}</p>
+            <div class="flex gap-2 mt-3">
+              <button onclick="saveAnalyzedProduct('${data.name.replace(/'/g, "\\'")}', ${data.price_usd}, '${(data.image_url || '').replace(/'/g, "\\'")}', '${(data.product_url || '').replace(/'/g, "\\'")}')" class="bg-accent-600 hover:bg-accent-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                + Guardar en Productos
+              </button>
+              <button onclick="useAnalyzedProduct('${data.name.replace(/'/g, "\\'")}', ${data.price_usd}, '${(data.image_url || '').replace(/'/g, "\\'")}')" class="bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                Calculadora
+              </button>
+              <a href="${data.product_url}" target="_blank" class="text-brand-400 hover:text-brand-300 text-xs font-medium self-center">Ver →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    showToast('Producto analizado correctamente', 'success');
+  } catch(e) {
+    resultDiv.innerHTML = `<p class="text-danger-400 text-sm">❌ Error: ${e.message}</p>`;
+    showToast('Error analizando URL', 'error');
+  }
+}
+
+function useAnalyzedProduct(name, price, image) {
+  showTab('calculator');
+  document.getElementById('calc-cost').value = price;
+  document.getElementById('p-name').value = name;
+  document.getElementById('p-image').value = image;
+  showToast('Datos cargados en calculadora', 'info');
+}
+
+async function saveAnalyzedProduct(name, price, image, url) {
+  try {
+    const body = {
+      name: name,
+      product_cost_usd: price,
+      shipping_cost_usd: 0,
+      image_url: image || '',
+      source_url: url || '',
+      status: 'researching',
+      category: 'tecnologia',
+    };
+    const r = await fetch(API + '/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    showToast('✅ Producto guardado en tu base', 'success');
+    loadStats();
+  } catch(e) {
+    showToast('Error guardando producto', 'error');
+  }
+}
+
+// Category-specific gradients for when no image is available
+const CATEGORY_GRADIENTS = {
+  tecnologia: 'from-blue-600/30 via-cyan-500/20 to-slate-800',
+  hogar_inteligente: 'from-emerald-600/30 via-teal-500/20 to-slate-800',
+  electronica: 'from-violet-600/30 via-purple-500/20 to-slate-800',
+  bienestar: 'from-rose-500/30 via-pink-500/20 to-slate-800',
+  accesorios_auto: 'from-orange-600/30 via-amber-500/20 to-slate-800',
+  mascotas: 'from-lime-600/30 via-green-500/20 to-slate-800',
+  herramientas: 'from-yellow-600/30 via-orange-500/20 to-slate-800',
+  moda_accesorios: 'from-fuchsia-600/30 via-pink-500/20 to-slate-800',
+  deportes: 'from-red-600/30 via-orange-500/20 to-slate-800',
+  juguetes: 'from-indigo-600/30 via-blue-500/20 to-slate-800',
+  papeleria: 'from-cyan-600/30 via-sky-500/20 to-slate-800',
+};
+
+function getCategoryGradient(cat) {
+  return CATEGORY_GRADIENTS[cat] || 'from-slate-600/30 via-slate-500/20 to-slate-800';
+}
+
+// Hunter pagination state
+window.hunterPage = 1;
+window.hunterLimit = 20;
+window.hunterNiches = [];
+window._hunterFilterTimer = null;
+
+function debounceHunterFilter() {
+ clearTimeout(window._hunterFilterTimer);
+ window._hunterFilterTimer = setTimeout(() => loadNiches(1), 600);
+}
+
+function clearHunterSearch() {
+  const searchInput = document.getElementById('hunter-search');
+  if (searchInput) searchInput.value = '';
+  const minCost = document.getElementById('hunter-min-cost');
+  if (minCost) minCost.value = '';
+  const maxCost = document.getElementById('hunter-max-cost');
+  if (maxCost) maxCost.value = '';
+  loadNiches(1);
+}
+
+async function loadNiches(page = 1) {
+  const grid = document.getElementById('niches-grid');
+  const pagination = document.getElementById('hunter-pagination');
+  const pageInfo = document.getElementById('hunter-page-info');
+  const pageIndicator = document.getElementById('hunter-page-indicator');
+  const prevBtn = document.getElementById('hunter-prev');
+  const nextBtn = document.getElementById('hunter-next');
+  const withImages = document.getElementById('hunter-images-toggle').checked;
+  const searchInput = document.getElementById('hunter-search');
+  const sortInput = document.getElementById('hunter-sort');
+  const minCostInput = document.getElementById('hunter-min-cost');
+  const maxCostInput = document.getElementById('hunter-max-cost');
+  const sourceBadge = document.getElementById('hunter-source-badge');
+  
+  const query = searchInput ? searchInput.value.trim() : '';
+  const sortVal = sortInput ? sortInput.value : 'demand:desc';
+  const [sortBy, sortOrder] = sortVal.split(':');
+  const minCost = minCostInput && minCostInput.value ? parseFloat(minCostInput.value) : '';
+  const maxCost = maxCostInput && maxCostInput.value ? parseFloat(maxCostInput.value) : '';
+  
+  window.hunterPage = page;
+  
+  // Show loading state
+  grid.innerHTML = `
+    <div class="col-span-full flex flex-col items-center justify-center py-16">
+      <div class="spinner mb-4"></div>
+      <p class="text-sm text-slate-400">${query ? 'Buscando productos...' : (withImages ? 'Buscando im\u00e1genes reales de productos...' : 'Cargando...')}</p>
+      <p class="text-xs text-slate-500 mt-1">${withImages ? 'Esto puede tardar unos segundos' : ''}</p>
+    </div>`;
+  pagination.classList.add('hidden');
+  if (sourceBadge) sourceBadge.classList.add('hidden');
+  
+    try {
+    let url = API + '/api/hunter/trending?limit=' + window.hunterLimit + '&page=' + page + '&with_images=' + withImages;
+    url += '&sort_by=' + encodeURIComponent(sortBy) + '&sort_order=' + encodeURIComponent(sortOrder);
+    if (query) url += '&q=' + encodeURIComponent(query);
+    if (minCost !== '' && !isNaN(minCost)) url += '&min_cost=' + minCost;
+    if (maxCost !== '' && !isNaN(maxCost)) url += '&max_cost=' + maxCost;
+    const r = await fetch(url);
+    const d = await r.json();
+    
+    window.hunterNiches = d.products || [];
+    
+    // Show source badge
+    if (sourceBadge && d.source) {
+      const sourceLabels = {
+        'live': '🔥 Hunter en vivo',
+        'curated': '📚 Nichos curados',
+        'empty': '⏳ Esperando búsqueda'
+      };
+      sourceBadge.textContent = sourceLabels[d.source] || d.source;
+      sourceBadge.classList.remove('hidden');
+    }
+    
+    // Update pagination info
+    pageInfo.textContent = (d.total_available || 0) + ' productos' + (d.total_pages > 1 ? ' · ' + d.total_pages + ' páginas' : '');
+    pageIndicator.textContent = 'Página ' + d.page + ' de ' + d.total_pages;
+    prevBtn.disabled = d.page <= 1;
+    nextBtn.disabled = d.page >= d.total_pages;
+    pagination.classList.remove('hidden');
+    
+    if (!d.products || d.products.length === 0) {
+      const emptyMsg = d.message || 'No hay productos disponibles. Ingres\u00e1 un t\u00e9rmino de b\u00fasqueda para encontrar productos.';
+      grid.innerHTML = `
+        <div class="empty-state col-span-full py-12">
+          <div class="empty-state-icon">🔍</div>
+          <p class="text-slate-400 text-sm max-w-md mx-auto">${emptyMsg}</p>
+          ${d.source === 'empty' ? '<p class="text-xs text-slate-500 mt-2">Ejemplos: auriculares, smartwatch, l\u00e1mpara, cafetera...</p>' : ''}
+        </div>`;
+      return;
+    }
+    
+    grid.innerHTML = d.products.map((n, i) => {
+      const isLive = n.source === 'aliexpress-live' || n.source === 'live-hunter' || n.source === 'live';
+      const profitScore = n.profit_score || (isLive ? 70 : 50);
+      const demand = n.demand || (isLive ? 75 : 50);
+      const profitColor = profitScore >= 80 ? 'text-accent-400' : profitScore >= 60 ? 'text-gold-400' : 'text-slate-400';
+      const profitBg = profitScore >= 80 ? 'bg-accent-500/15 border-accent-500/30' : profitScore >= 60 ? 'bg-gold-500/15 border-gold-500/30' : 'bg-slate-500/15 border-slate-500/30';
+      const demandBadge = demand >= 85 ? 'bg-red-500/20 text-red-400' : demand >= 70 ? 'bg-accent-500/20 text-accent-400' : 'bg-slate-500/20 text-slate-400';
+      const cat = n.cat || 'tecnologia';
+      const grad = getCategoryGradient(cat);
+      const emoji = getCategoryEmoji(cat);
+      const realIndex = (page - 1) * window.hunterLimit + i;
+      const hasRealImg = n.has_real_image && n.img;
+      const rating = n.est_rating || n.rating || 4.5;
+      const reviews = n.est_reviews || n.reviews || n.orders || 0;
+      const competition = n.competition_level || 'Media';
+      const season = n.season || 'Todo el año';
+      const marginPotential = n.margin_potential || (isLive ? '~70%' : '~50%');
+      const trend = n.trend || (isLive ? '📈 En tendencia' : '➡️ Estable');
+const cost = n.cost_usd || n.cost || n.price_usd || 0;
+const ship = n.ship_usd || n.ship || 3.5;
+const ml = n.ml_avg || n.ml || 0;
+const mlUyu = ml > 0 ? ml : Math.round(cost * 2.5 * 42);
+const keywords = n.keywords || (isLive ? 'import,china,aliexpress' : 'producto');
+const sourceUrl = n.source_url || '';
+const hasRealLink = sourceUrl && sourceUrl.includes('/item') || sourceUrl.includes('/product') || sourceUrl.includes('/p/') || (sourceUrl.includes('aliexpress') && sourceUrl !== `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(n.name)}`);
+const searchUrl = `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(n.name)}`;
+      
+      return `
+      <div class="product-card glass rounded-2xl overflow-hidden gradient-border flex flex-col" style="animation: slideUp 0.4s ease-out ${i * 0.05}s both;">
+        <div class="h-48 bg-gradient-to-br ${grad} overflow-hidden relative flex items-center justify-center">
+          ${hasRealImg ? `<img src="${n.img}" class="card-image w-full h-full object-cover absolute inset-0" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : ''}
+          <div class="absolute inset-0 flex items-center justify-center ${hasRealImg ? 'hidden' : ''}">
+            <span class="text-7xl opacity-40 select-none">${emoji}</span>
+          </div>
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/30 to-transparent"></div>
+          <span class="absolute bottom-3 left-3 text-xs font-bold px-2.5 py-1 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10">${n.cat.replace('_', ' ')}</span>
+          <span class="absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-lg ${demandBadge}">🔥 ${demand}/100</span>
+          <span class="absolute top-3 left-3 text-xs font-bold px-2.5 py-1 rounded-lg ${profitBg}">${trend}</span>
+          ${hasRealImg ? '<span class="absolute bottom-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">📷 Real</span>' : ''}
+        </div>
+        <div class="p-5 flex-1 flex flex-col">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <h4 class="font-bold text-sm leading-tight">${n.name}</h4>
+            <div class="text-right shrink-0">
+              <span class="text-lg font-black ${profitColor}">${profitScore}</span>
+              <p class="text-[10px] text-slate-500">score</p>
+            </div>
+          </div>
+          
+          <p class="text-xs text-slate-400 mb-3 line-clamp-2">${n.desc}</p>
+          
+          <div class="flex flex-wrap gap-1.5 mb-3">
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Rating">⭐ ${rating}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Reviews">💬 ${reviews}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Competencia">📊 ${competition}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Temporada">📅 ${season}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Margen">📈 ${marginPotential}</span>
+          </div>
+          
+<div class="grid grid-cols-3 gap-2 mb-3 text-center">
+    <div class="bg-slate-800/50 rounded-lg p-2">
+    <p class="text-[10px] text-slate-500">Costo USD</p>
+    <p class="text-sm font-bold text-white">US$${cost}</p>
+    </div>
+    <div class="bg-slate-800/50 rounded-lg p-2">
+    <p class="text-[10px] text-slate-500">Flete USD</p>
+    <p class="text-sm font-bold text-white">US$${ship}</p>
+    </div>
+    <div class="bg-slate-800/50 rounded-lg p-2">
+    <p class="text-[10px] text-slate-500">ML ${ml > 0 ? 'UYU' : '~est.'}</p>
+    <p class="text-sm font-bold text-brand-400">$${ml > 0 ? ml : mlUyu}</p>
+    </div>
+    </div>
+          
+          <div class="mt-auto pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+            <div class="flex gap-1.5 overflow-hidden">
+              ${(n.keywords || '').split(',').slice(0,3).map(k => `<span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 truncate">${k.trim()}</span>`).join('')}
+            </div>
+            <div class="flex gap-1.5 shrink-0">
+              <a href="${hasRealLink ? sourceUrl : searchUrl}" target="_blank" title="${hasRealLink ? 'Ver producto' : 'Buscar en AliExpress'}" class="text-xs ${hasRealLink ? 'bg-brand-700 hover:bg-brand-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'} px-2 py-1.5 rounded-lg font-semibold transition">${hasRealLink ? '🔗' : '🔍'}</a>
+              <button onclick="saveNicheToProducts(${i})" class="text-xs bg-accent-600 hover:bg-accent-500 text-white px-3 py-1.5 rounded-lg font-bold transition shadow-lg shadow-accent-600/20">+ Guardar</button>
+<button onclick="addNicheToCalc('${n.name.replace(/'/g, "\\\\'")}', ${cost}, ${ship}, ${mlUyu})" class="text-xs bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 px-2 py-1.5 rounded-lg font-semibold transition" title="Calcular">💰</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { 
+    console.error(e);
+    grid.innerHTML = `
+      <div class="empty-state col-span-full py-12">
+        <div class="empty-state-icon">⚠️</div>
+        <p class="text-slate-500">Error cargando nichos</p>
+        <button onclick="loadNiches(1)" class="text-brand-400 hover:text-brand-300 text-sm font-medium mt-2">Reintentar</button>
+      </div>`;
+  }
+}
+
+function getCategoryEmoji(cat) {
+  const emojis = {
+    tecnologia: '💻', hogar_inteligente: '🏠', electronica: '🔌',
+    bienestar: '💆', accesorios_auto: '🚗', mascotas: '🐕',
+    herramientas: '🔧', moda_accesorios: '👕', deportes: '⚽',
+    juguetes: '🎮', papeleria: '📝'
+  };
+  return emojis[cat] || '📦';
+}
+
+function addNicheToCalc(name, cost, ship, ml) {
+  showTab('calculator');
+  document.getElementById('calc-cost').value = cost;
+  document.getElementById('calc-shipping').value = ship;
+  document.getElementById('calc-comp').value = ml;
+  document.getElementById('p-name').value = name;
+  runCalc();
+  showToast('Nicho cargado en calculadora', 'success');
+}
+
+async function saveNicheToProducts(index) {
+const n = window.hunterNiches[index];
+if (!n) return;
+
+// Use the image already found by the hunter (real photo or fallback)
+const realImg = n.img || '';
+const costUsd = n.cost_usd || n.cost || 0;
+const shipUsd = n.ship_usd || n.ship || 0;
+const mlPrice = n.ml_avg || n.ml || 0;
+// Convert ML price to UYU if it seems like USD (ml_avg from backend is already in UYU from the formula)
+const mlCompetitorPrice = mlPrice > 0 ? mlPrice : 0;
+
+try {
+const body = {
+name: n.name,
+description: n.desc || '',
+product_cost_usd: costUsd,
+shipping_cost_usd: shipUsd,
+ml_competitor_price: mlCompetitorPrice,
+image_url: realImg,
+source_url: n.source_url || '',
+status: 'researching',
+category: n.cat || 'tecnologia',
+};
+const r = await fetch(API + '/products', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(body)
+});
+const data = await r.json();
+showToast('Guardado: ' + n.name + ' — ' + data.best_strategy + ' ' + Math.round(data.best_margin) + '%', 'success');
+loadStats();
+document.getElementById('filter-status').value = '';
+document.getElementById('filter-margin').value = '';
+document.getElementById('filter-strategy').value = '';
+showTab('products');
+} catch(e) {
+console.error(e);
+showToast('Error guardando producto', 'error');
+}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCTS
+// ═══════════════════════════════════════════════════════════════
+async function loadProducts(searchQuery = null) {
+  const status = document.getElementById('filter-status').value;
+  const margin = document.getElementById('filter-margin').value;
+  const strategy = document.getElementById('filter-strategy').value;
+  
+  let url = API + '/products?';
+  if (status) url += 'status=' + status + '&';
+  if (margin) url += 'min_margin=' + margin + '&';
+  if (strategy) url += 'strategy=' + strategy + '&';
+  url += 'limit=100';
+  
+  try {
+    const r = await fetch(url);
+    let products = await r.json();
+    currentProducts = products;
+    
+    // Client-side search if query provided
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      products = products.filter(p => p.name.toLowerCase().includes(q));
+    }
+    
+    document.getElementById('products-count').textContent = products.length + ' productos';
+    const grid = document.getElementById('products-grid');
+    
+    if (products.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state col-span-full py-12">
+          <div class="empty-state-icon">📭</div>
+          <p class="text-slate-500 text-sm mb-2">No se encontraron productos</p>
+          <button onclick="openAddModal()" class="text-brand-400 hover:text-brand-300 text-sm font-medium">+ Agregar uno nuevo</button>
+        </div>`;
+      return;
+    }
+    
+    grid.innerHTML = products.map((p, i) => renderProductCard(p, i)).join('');
+  } catch(e) { 
+    console.error(e);
+    showToast('Error cargando productos', 'error');
+  }
+}
+
+function renderProductCard(p, index) {
+  const marginClass = p.best_margin >= 70 ? 'margin-great' : p.best_margin >= 60 ? 'margin-good' : p.best_margin >= 50 ? 'margin-ok' : 'margin-low';
+  return `
+    <div class="product-card glass rounded-2xl overflow-hidden" style="animation: slideUp 0.4s ease-out ${index * 0.04}s both;">
+      <div class="h-44 bg-gradient-to-br from-slate-800 to-slate-700 flex items-center justify-center overflow-hidden relative">
+        ${p.image_url ? `<img src="${p.image_url}" class="card-image w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">` : ''}
+        <span class="text-5xl opacity-20">${getCategoryEmoji(p.category)}</span>
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
+        <span class="absolute top-3 right-3 margin-badge ${marginClass}">${p.best_margin}%</span>
+      </div>
+      <div class="p-5">
+        <div class="flex justify-between items-start mb-2">
+          <h4 class="font-bold text-sm flex-1 pr-2">${p.name}</h4>
+          <select onchange="updateProductStatus(${p.id}, this.value)" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs font-medium focus:border-brand-500 focus:outline-none">
+            <option value="researching" ${p.status === 'researching' ? 'selected' : ''}>🔍</option>
+            <option value="sourcing" ${p.status === 'sourcing' ? 'selected' : ''}>🔎</option>
+            <option value="ordered" ${p.status === 'ordered' ? 'selected' : ''}>📋</option>
+            <option value="in_transit" ${p.status === 'in_transit' ? 'selected' : ''}>✈️</option>
+            <option value="customs" ${p.status === 'customs' ? 'selected' : ''}>🛃</option>
+            <option value="arrived" ${p.status === 'arrived' ? 'selected' : ''}>📦</option>
+            <option value="testing" ${p.status === 'testing' ? 'selected' : ''}>🧪</option>
+            <option value="listed" ${p.status === 'listed' ? 'selected' : ''}>🏷️</option>
+            <option value="winner" ${p.status === 'winner' ? 'selected' : ''}>🏆</option>
+            <option value="flop" ${p.status === 'flop' ? 'selected' : ''}>❌</option>
+          </select>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Landed: $${Math.round(p.total_landed_cost_uyu)} · ML: $${Math.round(p.ml_competitor_price || 0)}</p>
+        <div class="grid grid-cols-3 gap-2 text-xs mb-3">
+          <div class="bg-slate-800/50 rounded-lg p-2 text-center">
+            <p class="text-slate-500">CP</p>
+            <p class="font-bold">$${Math.round(p.price_cost_plus_uyu)}</p>
+          </div>
+          <div class="bg-brand-500/10 rounded-lg p-2 text-center">
+            <p class="text-brand-400">Ag</p>
+            <p class="font-bold text-brand-400">$${Math.round(p.price_aggressive_uyu)}</p>
+          </div>
+          <div class="bg-gold-500/10 rounded-lg p-2 text-center">
+            <p class="text-gold-400">Ex</p>
+            <p class="font-bold text-gold-400">$${Math.round(p.price_extreme_uyu)}</p>
+          </div>
+        </div>
+ <div class="flex justify-between items-center pt-2 border-t border-slate-700/50">
+ <div class="flex items-center gap-2">
+ <span class="text-[10px] text-slate-500 uppercase font-bold">${p.best_strategy.replace('_', ' ')}</span>
+ ${p.source_url ? `<a href="${p.source_url}" target="_blank" class="text-[10px] px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/30 hover:bg-brand-500/20 transition font-semibold" title="Ver producto en la fuente">🔗 Fuente</a>` : ''}
+ </div>
+ <div class="flex gap-1">
+ <button onclick="openProductAnalysis(${p.id})" class="text-slate-500 hover:text-brand-400 transition p-1" title="Analizar">📊</button>
+ <button onclick="deleteProduct(${p.id})" class="text-slate-500 hover:text-danger-400 transition p-1" title="Eliminar">🗑️</button>
+ </div>
+ </div>
+ </div>
+ </div>
+ `;
+}
+
+async function updateProductStatus(id, status) {
+  try {
+    await fetch(API + '/products/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    showToast('Estado actualizado', 'success', 2000);
+    loadStats();
+  } catch(e) {
+    showToast('Error actualizando estado', 'error');
+  }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('¿Eliminar este producto?')) return;
+  try {
+    await fetch(API + '/products/' + id, { method: 'DELETE' });
+    showToast('Producto eliminado', 'success');
+    loadProducts();
+    loadStats();
+  } catch(e) {
+    showToast('Error eliminando', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCT ANALYSIS MODAL
+// ═══════════════════════════════════════════════════════════════
+let currentAnalysisData = null;
+
+async function openProductAnalysis(id) {
+  document.getElementById('analysis-modal').classList.remove('hidden');
+  document.getElementById('analysis-loading').classList.remove('hidden');
+  document.getElementById('analysis-content').classList.add('hidden');
+  document.body.style.overflow = 'hidden';
+  
+  try {
+    const r = await fetch(API + '/products/' + id + '/analysis');
+    const d = await r.json();
+    currentAnalysisData = d;
+    
+    document.getElementById('analysis-title').textContent = d.product_name;
+    document.getElementById('analysis-subtitle').textContent = 'Análisis completo · Estrategia: ' + d.best_strategy.replace('_', ' ');
+    
+    renderAnalysisOverview(d);
+    renderAnalysisProjections(d);
+    renderAnalysisInventory(d);
+    
+    document.getElementById('analysis-loading').classList.add('hidden');
+    document.getElementById('analysis-content').classList.remove('hidden');
+    
+    // Default to overview tab
+    switchAnalysisTab('overview');
+  } catch(e) {
+    console.error(e);
+    showToast('Error cargando análisis', 'error');
+    closeAnalysisModal();
+  }
+}
+
+function closeAnalysisModal() {
+  document.getElementById('analysis-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  currentAnalysisData = null;
+}
+
+function switchAnalysisTab(tab) {
+  document.querySelectorAll('.analysis-tab').forEach(el => {
+    el.classList.remove('bg-brand-600/10', 'text-brand-400', 'border', 'border-brand-600/20', 'border-b-0');
+    el.classList.add('text-slate-400');
+  });
+  document.getElementById('tab-btn-' + tab).classList.add('bg-brand-600/10', 'text-brand-400', 'border', 'border-brand-600/20', 'border-b-0');
+  document.getElementById('tab-btn-' + tab).classList.remove('text-slate-400');
+  
+  ['overview', 'projections', 'inventory'].forEach(t => {
+    document.getElementById('analysis-tab-' + t).classList.add('hidden');
+  });
+  document.getElementById('analysis-tab-' + tab).classList.remove('hidden');
+}
+
+function renderAnalysisOverview(d) {
+  const km = d.key_metrics;
+  document.getElementById('a-landed').textContent = '$' + km.landed_cost_uyu.toLocaleString();
+  document.getElementById('a-price').textContent = '$' + km.selling_price_uyu.toLocaleString();
+  document.getElementById('a-margin').textContent = km.margin_percent + '%';
+  document.getElementById('a-profit').textContent = '$' + d.break_even.profit_per_unit.toLocaleString();
+  
+  document.getElementById('a-investment').textContent = '$' + d.break_even.initial_investment_uyu.toLocaleString();
+  document.getElementById('a-breakeven').textContent = d.break_even.units + ' unid.';
+  
+  // Break-even bar (max 50 units = 100%)
+  const bePct = Math.min(100, Math.max(5, (d.break_even.units / 50) * 100));
+  document.getElementById('a-be-bar').style.width = bePct + '%';
+  
+  // Find break-even month
+  let beMonth = 1;
+  for (let i = 0; i < d.projections.length; i++) {
+    const cumul = d.projections[i].conservative.cumulative_profit;
+    if (cumul >= d.break_even.initial_investment_uyu) {
+      beMonth = i + 1;
+      break;
+    }
+  }
+  document.getElementById('a-be-month').textContent = beMonth;
+  
+  // Risk
+  const riskColors = { 'Bajo': 'bg-green-500/20 text-green-400', 'Medio': 'bg-gold-500/20 text-gold-400', 'Alto': 'bg-red-500/20 text-red-400' };
+  document.getElementById('a-risk-badge').className = 'text-xs font-bold px-3 py-1 rounded-full ' + (riskColors[d.risk.level] || 'bg-slate-500/20 text-slate-400');
+  document.getElementById('a-risk-badge').textContent = d.risk.level + ' (' + d.risk.score + '/100)';
+  
+  const riskLabels = { demand_risk: 'Demanda', competition_risk: 'Competencia', margin_risk: 'Margen', seasonality_risk: 'Estacionalidad' };
+  document.getElementById('a-risk-factors').innerHTML = Object.entries(d.risk.factors).map(([k, v]) => `
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-slate-400 w-28">${riskLabels[k] || k}</span>
+      <div class="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div class="h-full rounded-full ${v < 35 ? 'bg-green-500' : v < 60 ? 'bg-gold-500' : 'bg-red-500'}" style="width: ${v}%"></div>
+      </div>
+      <span class="text-xs text-slate-500 w-8 text-right">${v}</span>
+    </div>
+  `).join('');
+  
+  // Insights
+  document.getElementById('a-insights').innerHTML = d.insights.map(i => `
+    <div class="flex items-start gap-2 text-sm text-slate-300">
+      <span class="text-brand-400 mt-0.5">▸</span>
+      <span>${i}</span>
+    </div>
+  `).join('');
+  
+  // ROI
+  document.getElementById('a-roi-cons').textContent = d.annual_summary.conservative_roi + '%';
+  document.getElementById('a-profit-cons').textContent = '$' + d.annual_summary.conservative_profit.toLocaleString();
+  document.getElementById('a-roi-opt').textContent = d.annual_summary.optimistic_roi + '%';
+  document.getElementById('a-profit-opt').textContent = '$' + d.annual_summary.optimistic_profit.toLocaleString();
+}
+
+function renderAnalysisProjections(d) {
+  // Mini bar chart
+  const maxVal = Math.max(...d.projections.map(p => p.optimistic.cumulative_profit));
+  document.getElementById('a-chart-container').innerHTML = d.projections.map((p, i) => {
+    const hCons = Math.max(5, (p.conservative.cumulative_profit / maxVal) * 100);
+    const hOpt = Math.max(5, (p.optimistic.cumulative_profit / maxVal) * 100);
+    return `
+      <div class="flex-1 flex flex-col justify-end items-center gap-0.5 group">
+        <div class="w-full flex flex-col justify-end items-center gap-px" style="height: ${hOpt}%">
+          <div class="w-full bg-brand-500 rounded-t-sm" style="height: ${(hOpt - hCons) / hOpt * 100}%; min-height: 2px;"></div>
+          <div class="w-full bg-slate-600 rounded-t-sm" style="height: ${hCons / hOpt * 100}%; min-height: 2px;"></div>
+        </div>
+        <span class="text-[9px] text-slate-600">${p.month}</span>
+      </div>
+    `;
+  }).join('');
+  
+  // Table
+  document.getElementById('a-projection-table').innerHTML = d.projections.map(p => `
+    <tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
+      <td class="py-2 px-2 text-slate-300 font-medium">${p.month}</td>
+      <td class="py-2 px-2 text-right text-brand-400">${p.optimistic.units}</td>
+      <td class="py-2 px-2 text-right text-slate-400">$${p.optimistic.revenue.toLocaleString()}</td>
+      <td class="py-2 px-2 text-right text-gold-400 font-bold">$${p.optimistic.profit.toLocaleString()}</td>
+      <td class="py-2 px-2 text-right text-white font-bold">$${p.optimistic.cumulative_profit.toLocaleString()}</td>
+    </tr>
+  `).join('');
+}
+
+function renderAnalysisInventory(d) {
+  document.getElementById('a-order-qty').textContent = d.inventory.suggested_first_order;
+  document.getElementById('a-reorder').textContent = d.inventory.reorder_point;
+  document.getElementById('a-inventory-cost').textContent = '$' + d.inventory.inventory_cost_uyu.toLocaleString();
+  document.getElementById('a-order-qty-2').textContent = d.inventory.suggested_first_order;
+  document.getElementById('a-landed-2').textContent = '$' + d.key_metrics.landed_cost_uyu.toLocaleString();
+  
+  // Pricing comparison
+  const compDiv = document.getElementById('a-pricing-comparison');
+  if (Object.keys(d.pricing_vs_competitor).length === 0) {
+    compDiv.innerHTML = '<p class="text-sm text-slate-500">No hay datos de competencia para comparar.</p>';
+  } else {
+    const compPrice = d.key_metrics.competitor_price_uyu || 0;
+    compDiv.innerHTML = Object.entries(d.pricing_vs_competitor).map(([strat, data]) => {
+      const barWidth = Math.min(100, Math.max(10, (data.price / compPrice) * 50));
+      const color = data.position === 'below' ? 'bg-green-500' : data.position === 'match' ? 'bg-gold-500' : 'bg-red-500';
+      return `
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-400 w-24">${strat.replace('_', ' ')}</span>
+          <div class="flex-1 bg-slate-800 rounded-full h-4 overflow-hidden relative">
+            <div class="${color} h-full rounded-full flex items-center justify-end px-2 transition-all" style="width: ${barWidth}%">
+              <span class="text-[9px] text-white font-bold">$${Math.round(data.price)}</span>
+            </div>
+          </div>
+          <span class="text-xs ${data.vs_competitor < 0 ? 'text-green-400' : 'text-red-400'} w-16 text-right">${data.vs_competitor > 0 ? '+' : ''}${data.vs_competitor}%</span>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function exportCSV() {
+  if (currentProducts.length === 0) {
+    showToast('No hay productos para exportar', 'error');
+    return;
+  }
+  
+  const headers = ['Nombre', 'Categoria', 'Costo USD', 'Flete USD', 'Landed UYU', 'Estrategia', 'Margen', 'Estado', 'ML Competencia'];
+  const rows = currentProducts.map(p => [
+    p.name, p.category, p.product_cost_usd, p.shipping_cost_usd,
+    Math.round(p.total_landed_cost_uyu), p.best_strategy, p.best_margin + '%',
+    p.status, p.ml_competitor_price
+  ]);
+  
+  const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `productos_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+  showToast('CSV exportado correctamente', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALCULATOR
+// ═══════════════════════════════════════════════════════════════
+async function runCalc() {
+  const cost = parseFloat(document.getElementById('calc-cost').value);
+  const ship = parseFloat(document.getElementById('calc-shipping').value);
+  const tariff = parseFloat(document.getElementById('calc-tariff').value);
+  const comp = parseFloat(document.getElementById('calc-comp').value);
+  const agent = parseFloat(document.getElementById('calc-agent').value);
+  const rate = parseFloat(document.getElementById('calc-rate').value);
+  
+  if (!cost) {
+    showToast('Ingresá el costo del producto', 'error');
+    return;
+  }
+  
+  try {
+    const r = await fetch(API + '/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product_cost_usd: cost,
+        shipping_cost_usd: ship,
+        tariff_rate: tariff,
+        agent_fee_usd: agent,
+        competitor_price_uyu: comp
+      })
+    });
+    const d = await r.json();
+    
+    document.getElementById('calc-results').classList.remove('hidden');
+    const b = d.breakdown;
+    document.getElementById('res-cif').textContent = '$' + b.cif_usd;
+    document.getElementById('res-tariff').textContent = '$' + b.tariff_usd;
+    document.getElementById('res-iva').textContent = '$' + b.iva_usd;
+    document.getElementById('res-stat').textContent = '$' + b.stat_fee_usd;
+    document.getElementById('res-total').textContent = '$' + b.total_uyu + ' UYU';
+    document.getElementById('res-mult').textContent = b.multiplier + 'x';
+    
+    const s = d.strategies;
+    document.getElementById('res-price-cp').textContent = '$' + Math.round(s.cost_plus.price);
+    document.getElementById('res-margin-cp').textContent = 'Margen: ' + s.cost_plus.margin + '%';
+    document.getElementById('res-price-ag').textContent = '$' + Math.round(s.aggressive.price);
+    document.getElementById('res-margin-ag').textContent = 'Margen: ' + s.aggressive.margin + '%';
+    document.getElementById('res-price-lx').textContent = '$' + Math.round(s.luxury.price);
+    document.getElementById('res-margin-lx').textContent = 'Margen: ' + s.luxury.margin + '%';
+    document.getElementById('res-price-ex').textContent = '$' + Math.round(s.extreme.price);
+    document.getElementById('res-margin-ex').textContent = 'Margen: ' + s.extreme.margin + '%';
+    document.getElementById('res-price-val').textContent = '$' + Math.round(s.value.price);
+    document.getElementById('res-margin-val').textContent = 'Margen: ' + s.value.margin + '%';
+    document.getElementById('res-price-pr').textContent = '$' + Math.round(s.premium_vs_comp.price);
+    document.getElementById('res-margin-pr').textContent = 'Margen: ' + s.premium_vs_comp.margin + '%';
+    
+    document.getElementById('res-best-strat').textContent = d.best_strategy.replace('_', ' ').toUpperCase() + ' (' + Math.round(d.best_margin) + '%)';
+    showToast('Cálculo completado', 'success', 2000);
+  } catch(e) {
+    showToast('Error en el cálculo', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ML SEARCH
+// ═══════════════════════════════════════════════════════════════
+async function searchML() {
+  const q = document.getElementById('ml-query').value.trim();
+  const landedCost = parseFloat(document.getElementById('ml-landed-cost').value) || 0;
+  
+  if (!q) {
+    showToast('Ingresá un producto', 'error');
+    return;
+  }
+  
+  const resultsDiv = document.getElementById('ml-results');
+  const analysisDiv = document.getElementById('ml-analysis');
+  const summaryDiv = document.getElementById('ml-summary');
+  
+  analysisDiv.classList.add('hidden');
+  summaryDiv.classList.add('hidden');
+  resultsDiv.innerHTML = '<div class="flex items-center justify-center py-12"><div class="spinner mr-3"></div><span class="text-slate-400">Analizando mercado en Uruguay...</span></div>';
+  
+  try {
+    // Call analyze endpoint
+    const analyzeResp = await fetch(API + '/ml-analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q, my_landed_cost_uyu: landedCost })
+    });
+    const analysis = await analyzeResp.json();
+    
+    if (analysis.error) {
+      resultsDiv.innerHTML = `<p class="text-danger-400 text-center py-8">Error: ${analysis.error}</p>`;
+      return;
+    }
+    
+    // Render analysis banner
+    const recColors = {
+      GO: 'from-accent-500/20 to-brand-500/20 border-accent-500/30 text-accent-400',
+      CAUTION: 'from-gold-500/20 to-orange-500/20 border-gold-500/30 text-gold-400',
+      AVOID: 'from-danger-500/20 to-red-500/20 border-danger-500/30 text-danger-400',
+      NO_DATA: 'from-slate-500/20 to-gray-500/20 border-slate-500/30 text-slate-400',
+    };
+    const recColor = recColors[analysis.recommendation] || recColors.CAUTION;
+    
+    analysisDiv.classList.remove('hidden');
+    analysisDiv.innerHTML = `
+      <div class="glass rounded-2xl p-6 bg-gradient-to-r ${recColor} border gradient-border" style="animation: slideUp 0.4s ease-out;">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-black mb-1">${analysis.message}</h3>
+            <p class="text-sm opacity-80">Basado en ${analysis.market_data.total_results} resultados · ${analysis.market_data.unique_sellers} vendedores · ${analysis.market_data.total_sold} unidades vendidas</p>
+          </div>
+          <div class="text-right">
+            <span class="text-3xl font-black">${analysis.recommendation === 'GO' ? '✅' : analysis.recommendation === 'AVOID' ? '❌' : analysis.recommendation === 'NO_DATA' ? '❓' : '⚠️'}</span>
+          </div>
+        </div>
+        
+        ${analysis.margin_analysis ? `
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-white/10">
+          <div>
+            <p class="text-xs opacity-60">Tu costo</p>
+            <p class="text-lg font-bold">$${Math.round(analysis.margin_analysis.landed_cost)}</p>
+          </div>
+          <div>
+            <p class="text-xs opacity-60">Precio mercado</p>
+            <p class="text-lg font-bold">$${Math.round(analysis.margin_analysis.avg_market_price)}</p>
+          </div>
+          <div>
+            <p class="text-xs opacity-60">Margen potencial</p>
+            <p class="text-lg font-bold ${analysis.margin_analysis.potential_margin_percent >= 60 ? 'text-accent-400' : analysis.margin_analysis.potential_margin_percent >= 40 ? 'text-gold-400' : 'text-danger-400'}">${Math.round(analysis.margin_analysis.potential_margin_percent)}%</p>
+          </div>
+          <div>
+            <p class="text-xs opacity-60">Ganancia/unidad</p>
+            <p class="text-lg font-bold">$${Math.round(analysis.margin_analysis.profit_per_unit)}</p>
+          </div>
+        </div>
+        ` : ''}
+        
+        <div class="mt-4 grid md:grid-cols-2 gap-4">
+          ${analysis.opportunities.length > 0 ? `
+          <div>
+            <p class="text-xs font-bold uppercase tracking-wider mb-2 text-accent-400">Oportunidades</p>
+            <ul class="space-y-1">
+              ${analysis.opportunities.map(o => `<li class="text-sm flex items-start gap-2"><span class="text-accent-400 mt-0.5">+</span>${o}</li>`).join('')}
+            </ul>
+          </div>` : ''}
+          ${analysis.risks.length > 0 ? `
+          <div>
+            <p class="text-xs font-bold uppercase tracking-wider mb-2 text-danger-400">Riesgos</p>
+            <ul class="space-y-1">
+              ${analysis.risks.map(r => `<li class="text-sm flex items-start gap-2"><span class="text-danger-400 mt-0.5">−</span>${r}</li>`).join('')}
+            </ul>
+          </div>` : ''}
+        </div>
+      </div>
+    `;
+    
+    // Render summary cards
+    const md = analysis.market_data;
+    summaryDiv.classList.remove('hidden');
+    summaryDiv.innerHTML = `
+      <div class="glass rounded-xl p-4 text-center gradient-border">
+        <p class="text-xs text-slate-500 font-medium">Precio promedio</p>
+        <p class="text-2xl font-black text-brand-400">$${Math.round(md.avg_price)}</p>
+      </div>
+      <div class="glass rounded-xl p-4 text-center gradient-border">
+        <p class="text-xs text-slate-500 font-medium">Rango</p>
+        <p class="text-lg font-black text-accent-400">$${Math.round(md.min_price)} - $${Math.round(md.max_price)}</p>
+      </div>
+      <div class="glass rounded-xl p-4 text-center gradient-border">
+        <p class="text-xs text-slate-500 font-medium">Vendedores</p>
+        <p class="text-2xl font-black text-gold-400">${md.unique_sellers}</p>
+        <p class="text-[10px] text-slate-500">${md.official_stores} oficiales</p>
+      </div>
+      <div class="glass rounded-xl p-4 text-center gradient-border">
+        <p class="text-xs text-slate-500 font-medium">Vendidos</p>
+        <p class="text-2xl font-black text-purple-400">${md.total_sold}</p>
+      </div>
+    `;
+    
+    // Render results
+    if (!analysis.market_data.seller_list || analysis.market_data.seller_list.length === 0) {
+      resultsDiv.innerHTML = '';
+      return;
+    }
+    
+    resultsDiv.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <h4 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Vendedores principales</h4>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        ${analysis.market_data.seller_list.map(s => `
+          <span class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300">${s}</span>
+        `).join('')}
+      </div>
+    `;
+    
+    showToast('Análisis completado', 'success', 2000);
+  } catch(e) {
+    resultsDiv.innerHTML = '<p class="text-danger-400 text-center py-8">Error de conexión</p>';
+    showToast('Error analizando mercado', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADD PRODUCT MODAL
+// ═══════════════════════════════════════════════════════════════
+function openAddModal() {
+  document.getElementById('add-modal').classList.remove('hidden');
+}
+
+function closeAddModal() {
+  document.getElementById('add-modal').classList.add('hidden');
+}
+
+async function submitProduct() {
+  const body = {
+    name: document.getElementById('p-name').value,
+    category: document.getElementById('p-category').value,
+    source_url: document.getElementById('p-source').value,
+    image_url: document.getElementById('p-image').value,
+    product_cost_usd: parseFloat(document.getElementById('p-cost').value) || 0,
+    shipping_cost_usd: parseFloat(document.getElementById('p-shipping').value) || 0,
+    ml_competitor_price: parseFloat(document.getElementById('p-ml-price').value) || 0,
+    status: document.getElementById('p-status').value,
+    notes: document.getElementById('p-notes').value,
+  };
+  
+  if (!body.name) {
+    showToast('Nombre requerido', 'error');
+    return;
+  }
+  
+  try {
+    const r = await fetch(API + '/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    showToast('✅ Producto guardado', 'success');
+    closeAddModal();
+    loadProducts();
+    loadStats();
+  } catch(e) {
+    showToast('Error guardando producto', 'error');
+  }
+}
+
+// TRACKING / SHIPMENTS
+async function loadShipments() {
+  try {
+    const r = await fetch(API + '/shipments');
+    const shipments = await r.json();
+    const container = document.getElementById('shipments-list');
+    if (shipments.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state py-12">
+          <div class="empty-state-icon">🚚</div>
+          <p class="text-slate-500">No hay envios registrados</p>
+          <button onclick="openShipmentModal()" class="text-brand-400 hover:text-brand-300 text-sm font-medium mt-2">+ Crear primer envio</button>
+        </div>`;
+      return;
+    }
+    container.innerHTML = shipments.map((s, i) => `
+      <div class="glass rounded-2xl p-6 gradient-border" style="animation: slideUp 0.3s ease-out ${i * 0.05}s both;">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500/20 to-accent-500/20 flex items-center justify-center text-2xl">
+              ${s.status === 'delivered' ? '✅' : s.status === 'arrived' ? '📦' : s.status === 'customs' ? '🛃' : '✈️'}
+            </div>
+            <div>
+              <h4 class="font-bold">Envio #${s.id} — Producto #${s.product_id}</h4>
+              <p class="text-sm text-slate-500">${s.carrier || 'Sin transportista'} · ${s.tracking_number || 'Sin tracking'}</p>
+              <p class="text-xs text-slate-500 mt-0.5">${s.origin} → ${s.destination}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs font-bold px-3 py-1 rounded-full ${getStatusColor(s.status)}">${s.status.replace('_', ' ').toUpperCase()}</span>
+            <p class="text-xs text-slate-500 mt-1">$${s.shipping_cost_usd} USD</p>
+            ${s.estimated_arrival ? `<p class="text-xs text-brand-400">Llega: ${new Date(s.estimated_arrival).toLocaleDateString('es-UY')}</p>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+function getStatusColor(status) {
+  const colors = {
+    ordered: 'bg-slate-500/20 text-slate-400',
+    in_transit: 'bg-brand-500/20 text-brand-400',
+    customs: 'bg-gold-500/20 text-gold-400',
+    arrived: 'bg-accent-500/20 text-accent-400',
+    delivered: 'bg-purple-500/20 text-purple-400',
+  };
+  return colors[status] || 'bg-slate-500/20 text-slate-400';
+}
+function openShipmentModal() {
+  showToast('Formulario de envio — implementar con campos: product_id, carrier, tracking, status, fecha estimada', 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MARKETING & GROWTH
+// ═══════════════════════════════════════════════════════════════
+let marketingProducts = [];
+
+async function loadMarketing() {
+  try {
+    // Load dashboard stats
+    const dashR = await fetch(API + '/marketing/dashboard');
+    const dash = await dashR.json();
+    document.getElementById('m-total-campaigns').textContent = dash.campaigns.total;
+    document.getElementById('m-active-campaigns').textContent = dash.campaigns.active;
+    document.getElementById('m-ready-products').textContent = dash.products.ready_for_marketing;
+    document.getElementById('m-budget').textContent = '$' + (dash.products.ready_for_marketing * 5000).toLocaleString();
+    
+    // Load products for selects
+    const prodR = await fetch(API + '/products?limit=100');
+    marketingProducts = await prodR.json();
+    const options = marketingProducts.map(p => `<option value="${p.id}">${p.name} (${Math.round(p.best_margin)}%)</option>`).join('');
+    ['m-listing-product', 'm-social-product', 'm-email-product', 'm-strategy-product'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<option value="">Seleccionar producto...</option>' + options;
+    });
+    
+    // Load campaigns
+    loadCampaigns();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function generateListing() {
+  const pid = document.getElementById('m-listing-product').value;
+  const strategy = document.getElementById('m-listing-strategy').value;
+  if (!pid) return showToast('Selecciona un producto', 'error');
+  
+  const resultDiv = document.getElementById('m-listing-result');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = '<div class="spinner mx-auto"></div>';
+  
+  try {
+    const r = await fetch(API + '/products/' + pid + '/optimize-listing', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({strategy})
+    });
+    const d = await r.json();
+    resultDiv.innerHTML = `
+      <div class="bg-slate-800 rounded-lg p-3 space-y-2">
+        <div>
+          <p class="text-[10px] text-slate-500 uppercase font-bold">Titulo Optimizado</p>
+          <p class="text-sm font-bold text-white">${d.optimized_title}</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-slate-500 uppercase font-bold">Precio Sugerido</p>
+          <p class="text-sm text-brand-400 font-bold">$${Math.round(d.suggested_price)} UYU</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-slate-500 uppercase font-bold">Keywords</p>
+          <div class="flex flex-wrap gap-1">${d.keywords.map(k => `<span class="text-[10px] px-2 py-0.5 rounded bg-brand-500/10 text-brand-400">${k}</span>`).join('')}</div>
+        </div>
+        <div>
+          <p class="text-[10px] text-slate-500 uppercase font-bold">Tips</p>
+          <ul class="text-xs text-slate-400 space-y-0.5">${d.listing_tips.map(t => `<li>• ${t}</li>`).join('')}</ul>
+        </div>
+        <button onclick="copyToClipboard('${d.optimized_title.replace(/'/g, "\\'")}')" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">Copiar Titulo</button>
+      </div>`;
+  } catch(e) {
+    resultDiv.innerHTML = '<p class="text-sm text-red-400">Error generando listing</p>';
+  }
+}
+
+let lastSocialContent = null;
+let lastEmailContent = null;
+
+async function generateSocial(platform) {
+  const pid = document.getElementById('m-social-product').value;
+  if (!pid) return showToast('Selecciona un producto', 'error');
+  
+  const resultDiv = document.getElementById('m-social-result');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = '<div class="spinner mx-auto"></div>';
+  lastSocialContent = null;
+  
+  try {
+    const r = await fetch(API + '/products/' + pid + '/social-content', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({platform})
+    });
+    const d = await r.json();
+    const c = d.content;
+    lastSocialContent = d;
+    
+    let html = `<div class="bg-slate-800 rounded-lg p-3 space-y-2">`;
+    if (c.caption) html += `<div><p class="text-[10px] text-slate-500 uppercase font-bold">Caption</p><p class="text-xs text-slate-300 whitespace-pre-line">${c.caption}</p><button onclick="copyToClipboard(this.dataset.text)" data-text="${c.caption.replace(/"/g, '&quot;')}" class="mt-1 text-[10px] text-brand-400 hover:text-brand-300">Copiar</button></div>`;
+    if (c.tweet) html += `<div><p class="text-[10px] text-slate-500 uppercase font-bold">Tweet</p><p class="text-xs text-slate-300 whitespace-pre-line">${c.tweet}</p><button onclick="copyToClipboard(this.dataset.text)" data-text="${c.tweet.replace(/"/g, '&quot;')}" class="mt-1 text-[10px] text-brand-400 hover:text-brand-300">Copiar</button></div>`;
+    if (c.hook) html += `<div><p class="text-[10px] text-slate-500 uppercase font-bold">Hook</p><p class="text-xs text-slate-300">${c.hook}</p></div>`;
+    if (c.script) html += `<div><p class="text-[10px] text-slate-500 uppercase font-bold">Script</p><p class="text-xs text-slate-300 whitespace-pre-line">${c.script}</p></div>`;
+    html += `<div class="flex flex-wrap gap-1"><p class="text-[10px] text-slate-500 w-full">Hashtags</p>${d.hashtags.slice(0,6).map(h => `<span class="text-[10px] px-2 py-0.5 rounded bg-accent-500/10 text-accent-400">${h}</span>`).join('')}</div></div>`;
+    html += `<button onclick="saveCampaignFromSocial()" class="w-full mt-3 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg text-xs font-bold transition">Guardar Campaña</button>`;
+    resultDiv.innerHTML = html;
+  } catch(e) {
+    resultDiv.innerHTML = '<p class="text-sm text-red-400">Error generando contenido</p>';
+  }
+}
+
+async function saveCampaignFromSocial() {
+  if (!lastSocialContent) return;
+  const pid = lastSocialContent.product_id;
+  const name = `Social ${lastSocialContent.platform} — ${pid}`;
+  await saveCampaign(pid, name, 'social', lastSocialContent.content);
+}
+
+async function generateEmail() {
+  const pid = document.getElementById('m-email-product').value;
+  const type = document.getElementById('m-email-type').value;
+  if (!pid) return showToast('Selecciona un producto', 'error');
+  
+  const resultDiv = document.getElementById('m-email-result');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = '<div class="spinner mx-auto"></div>';
+  lastEmailContent = null;
+  
+  try {
+    const r = await fetch(API + '/products/' + pid + '/email-campaign', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({campaign_type: type, discount_percent: type === 'discount' ? 10 : 0, urgency: true})
+    });
+    const d = await r.json();
+    lastEmailContent = d;
+    resultDiv.innerHTML = `
+      <div class="bg-slate-800 rounded-lg p-3 space-y-2">
+        <div>
+          <p class="text-[10px] text-slate-500 uppercase font-bold">Asunto</p>
+          <p class="text-sm font-bold text-white">${d.subject}</p>
+        </div>
+        <div>
+          <p class="text-[10px] text-slate-500 uppercase font-bold">Preview</p>
+          <div class="text-xs text-slate-400 bg-slate-900 rounded p-2 max-h-32 overflow-y-auto">${d.html_body.substring(0, 500)}...</div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="copyToClipboard('${d.subject.replace(/'/g, "\\'")}')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">Copiar Asunto</button>
+          <button onclick="downloadHtml('${d.product_id}_email', '${d.html_body.replace(/'/g, "\\'")}')" class="flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded-lg text-xs font-semibold transition">Descargar HTML</button>
+        </div>
+        <button onclick="saveCampaignFromEmail()" class="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg text-xs font-bold transition">Guardar Campaña</button>
+      </div>`;
+  } catch(e) {
+    resultDiv.innerHTML = '<p class="text-sm text-red-400">Error generando email</p>';
+  }
+}
+
+async function saveCampaignFromEmail() {
+  if (!lastEmailContent) return;
+  const pid = lastEmailContent.product_id;
+  const name = `Email ${lastEmailContent.campaign_type} — ${pid}`;
+  await saveCampaign(pid, name, 'email', lastEmailContent.html_body);
+}
+
+async function saveCampaign(productId, name, type, content) {
+  try {
+    const r = await fetch(API + '/marketing/campaigns', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({product_id: productId, name, type, content})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('Campaña guardada', 'success');
+      loadCampaigns();
+    } else {
+      showToast('Error guardando campaña', 'error');
+    }
+  } catch(e) {
+    showToast('Error guardando campaña', 'error');
+  }
+}
+
+async function generateStrategy() {
+  const pid = document.getElementById('m-strategy-product').value;
+  if (!pid) return showToast('Selecciona un producto', 'error');
+  
+  const resultDiv = document.getElementById('m-strategy-result');
+  resultDiv.classList.remove('hidden');
+  resultDiv.innerHTML = '<div class="spinner mx-auto"></div>';
+  
+  try {
+    const r = await fetch(API + '/products/' + pid + '/marketing-strategy', {method: 'POST'});
+    const d = await r.json();
+    
+    let html = `<div class="bg-slate-800 rounded-lg p-3 space-y-3">`;
+    
+    // Strategies
+    html += `<div><p class="text-[10px] text-slate-500 uppercase font-bold mb-2">Estrategias Recomendadas</p>`;
+    d.strategies.forEach(s => {
+      html += `<div class="bg-slate-900/50 rounded-lg p-2 mb-2"><p class="text-xs font-bold text-white">${s.name}</p><p class="text-[10px] text-slate-400">${s.description}</p><p class="text-[10px] text-accent-400 mt-1">ROI esperado: ${s.expected_roi} · Budget: ${s.budget_percent}%</p></div>`;
+    });
+    html += `</div>`;
+    
+    // Action Plan
+    html += `<div><p class="text-[10px] text-slate-500 uppercase font-bold mb-2">Plan de 30 Dias</p><div class="space-y-1">`;
+    d.action_plan.forEach(a => {
+      html += `<div class="flex items-center gap-2 text-xs"><span class="text-brand-400 font-bold w-8">D${a.day}</span><span class="text-slate-300">${a.action}</span><span class="text-[10px] text-slate-500 ml-auto">${a.platform}</span></div>`;
+    });
+    html += `</div></div>`;
+    
+    // Budget
+    html += `<div class="flex items-center justify-between bg-slate-900/50 rounded-lg p-2"><span class="text-xs text-slate-400">Budget mensual recomendado</span><span class="text-sm font-bold text-gold-400">$${d.budget_recommendation.monthly_ads_uyu.toLocaleString()} UYU</span></div>`;
+    
+    // KPIs
+    html += `<div><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">KPIs Objetivo</p><div class="grid grid-cols-2 gap-2 text-xs">`;
+    Object.entries(d.kpis).forEach(([k, v]) => {
+      html += `<div class="bg-slate-900/50 rounded p-2"><p class="text-slate-500">${k.replace(/_/g, ' ')}</p><p class="text-white font-bold">${v}</p></div>`;
+    });
+    html += `</div></div></div>`;
+    
+    resultDiv.innerHTML = html;
+  } catch(e) {
+    resultDiv.innerHTML = '<p class="text-sm text-red-400">Error generando estrategia</p>';
+  }
+}
+
+async function loadCampaigns() {
+  try {
+    const r = await fetch(API + '/marketing/campaigns');
+    const d = await r.json();
+    const container = document.getElementById('m-campaigns-list');
+    if (d.campaigns.length === 0) {
+      container.innerHTML = '<p class="text-sm text-slate-500 text-center py-8">No hay campañas guardadas aun</p>';
+      return;
+    }
+    container.innerHTML = d.campaigns.map(c => {
+      const typeColors = {social: 'bg-accent-500/20 text-accent-400', email: 'bg-gold-500/20 text-gold-400', ads: 'bg-brand-500/20 text-brand-400'};
+      const color = typeColors[c.type] || 'bg-slate-500/20 text-slate-400';
+      return `<div class="flex items-center justify-between bg-slate-800/50 hover:bg-slate-800 rounded-lg p-3 cursor-pointer transition group" onclick="openCampaign(${c.id})"><div class="flex items-center gap-3"><span class="text-xs font-bold px-2 py-1 rounded ${color}">${c.type}</span><span class="text-sm text-slate-300 group-hover:text-white transition">${c.name}</span></div><div class="flex items-center gap-2"><button onclick="event.stopPropagation(); deleteCampaign(${c.id})" class="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10 transition" title="Borrar">🗑</button><span class="text-[10px] text-slate-500 group-hover:text-brand-400 transition">Ver →</span></div></div>`;
+    }).join('');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function deleteCampaign(id) {
+  if (!confirm('Seguro que queres borrar esta campaña?')) return;
+  try {
+    const r = await fetch(API + '/marketing/campaigns/' + id, {method: 'DELETE'});
+    if (r.ok) {
+      showToast('Campaña borrada', 'success');
+      loadCampaigns();
+      // If modal is open showing this campaign, close it
+      const modal = document.getElementById('campaign-modal');
+      if (!modal.classList.contains('hidden')) {
+        const title = document.getElementById('campaign-title').textContent;
+        // Simple check: if modal is open, close it to avoid stale state
+        closeCampaignModal();
+      }
+    } else {
+      showToast('Error borrando campaña', 'error');
+    }
+  } catch(e) {
+    showToast('Error borrando campaña', 'error');
+  }
+}
+
+let currentCampaignContent = '';
+let currentCampaignProductId = null;
+let currentCampaignImageUrl = '';
+let currentCampaignId = null;
+
+async function openCampaign(id) {
+  currentCampaignId = id;
+  document.getElementById('campaign-modal').classList.remove('hidden');
+  document.getElementById('campaign-loading').classList.remove('hidden');
+  document.getElementById('campaign-content').classList.add('hidden');
+  document.body.style.overflow = 'hidden';
+  
+  // Reset image generator
+  document.getElementById('campaign-image-result').classList.add('hidden');
+  currentCampaignImageUrl = '';
+  
+  try {
+    const r = await fetch(API + '/marketing/campaigns/' + id);
+    const d = await r.json();
+    
+    document.getElementById('campaign-title').textContent = d.name;
+    document.getElementById('campaign-subtitle').textContent = d.type + ' · ' + d.status + ' · ' + new Date(d.created_at).toLocaleDateString('es-UY');
+    
+    // Product image and name
+    currentCampaignProductId = d.product_id;
+    document.getElementById('campaign-product-name').textContent = d.product_name || '-';
+    const imgEl = document.getElementById('campaign-product-img');
+    if (d.product_image) {
+      imgEl.src = d.product_image;
+      imgEl.style.display = 'block';
+    } else {
+      imgEl.style.display = 'none';
+    }
+    
+    const bodyDiv = document.getElementById('campaign-body');
+    currentCampaignContent = '';
+    
+    if (d.is_json && d.parsed_content) {
+      // Social campaign - show parsed content
+      const c = d.parsed_content;
+      let html = '<div class="space-y-3">';
+      if (c.caption) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Caption</p><p class="text-sm text-slate-300 whitespace-pre-line">${c.caption}</p></div>`;
+        currentCampaignContent += c.caption + '\n\n';
+      }
+      if (c.tweet) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Tweet</p><p class="text-sm text-slate-300 whitespace-pre-line">${c.tweet}</p></div>`;
+        currentCampaignContent += c.tweet + '\n\n';
+      }
+      if (c.thread) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Thread</p><div class="space-y-1">${c.thread.map((t, i) => `<p class="text-sm text-slate-300">${t}</p>`).join('')}</div></div>`;
+        currentCampaignContent += c.thread.join('\n\n') + '\n\n';
+      }
+      if (c.hook) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Hook</p><p class="text-sm text-slate-300">${c.hook}</p></div>`;
+        currentCampaignContent += c.hook + '\n\n';
+      }
+      if (c.script) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Script</p><p class="text-sm text-slate-300 whitespace-pre-line">${c.script}</p></div>`;
+        currentCampaignContent += c.script + '\n\n';
+      }
+      if (c.story_text) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Story</p><p class="text-sm text-slate-300 whitespace-pre-line">${c.story_text}</p></div>`;
+        currentCampaignContent += c.story_text + '\n\n';
+      }
+      if (c.reel_hook) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Reel Hook</p><p class="text-sm text-slate-300">${c.reel_hook}</p></div>`;
+        currentCampaignContent += c.reel_hook + '\n\n';
+      }
+      if (c.call_to_action) {
+        html += `<div class="bg-slate-800 rounded-lg p-3"><p class="text-[10px] text-slate-500 uppercase font-bold mb-1">CTA</p><p class="text-sm text-brand-400 font-bold">${c.call_to_action}</p></div>`;
+        currentCampaignContent += c.call_to_action + '\n\n';
+      }
+      html += '</div>';
+      bodyDiv.innerHTML = html;
+    } else {
+      // Email or other - show raw content with preview
+      currentCampaignContent = d.content;
+      bodyDiv.innerHTML = `
+        <div class="bg-slate-800 rounded-lg p-3">
+          <p class="text-[10px] text-slate-500 uppercase font-bold mb-2">Contenido HTML</p>
+          <div class="bg-slate-900 rounded p-3 max-h-96 overflow-y-auto text-xs text-slate-400 font-mono whitespace-pre-wrap">${d.content.substring(0, 3000)}${d.content.length > 3000 ? '...' : ''}</div>
+        </div>
+      `;
+    }
+    
+    document.getElementById('campaign-loading').classList.add('hidden');
+    document.getElementById('campaign-content').classList.remove('hidden');
+  } catch(e) {
+    console.error(e);
+    showToast('Error cargando campaña', 'error');
+    closeCampaignModal();
+  }
+}
+
+function closeCampaignModal() {
+  document.getElementById('campaign-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  currentCampaignContent = '';
+  currentCampaignProductId = null;
+  currentCampaignImageUrl = '';
+  currentCampaignId = null;
+}
+
+async function generateQuickImage(pid, containerPrefix) {
+  // Generic image generator for any section (email, social, listing)
+  if (!pid) return showToast('Selecciona un producto primero', 'error');
+  const designEl = document.getElementById(containerPrefix + '-img-design');
+  const design = designEl ? designEl.value : 'product_photo';
+  const style = document.getElementById(containerPrefix + '-img-style').value;
+  const usage = document.getElementById(containerPrefix + '-img-usage').value;
+  const resultDiv = document.getElementById(containerPrefix + '-img-result');
+  const imgEl = document.getElementById(containerPrefix + '-img-el');
+  const spinnerEl = document.getElementById(containerPrefix + '-img-spinner');
+  const fallbackEl = document.getElementById(containerPrefix + '-img-fallback');
+  const fallbackLink = document.getElementById(containerPrefix + '-img-fallback-link');
+  const promptEl = document.getElementById(containerPrefix + '-img-prompt');
+  
+  resultDiv.classList.remove('hidden');
+  imgEl.src = '';
+  imgEl.classList.add('opacity-0');
+  spinnerEl.classList.remove('hidden');
+  fallbackEl.classList.add('hidden');
+  promptEl.textContent = 'Solicitando diseño...';
+  
+  try {
+    const url = API + '/products/' + pid + '/generate-campaign-image?style=' + style + '&usage=' + usage + '&design_type=' + design;
+    const r = await fetch(url);
+    const d = await r.json();
+    const imageUrl = d.image_url;
+    if (fallbackLink) fallbackLink.href = imageUrl;
+    promptEl.textContent = (d.design_type || design) + ' · Generando...';
+    
+    const loader = new Image();
+    let loaded = false;
+    let timeoutId = null;
+    
+    const onDone = () => {
+      if (loaded) return;
+      loaded = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      spinnerEl.classList.add('hidden');
+      imgEl.src = imageUrl;
+      imgEl.classList.remove('opacity-0');
+      fallbackEl.classList.add('hidden');
+      promptEl.textContent = (d.design_type || design) + ' · ' + (d.source || '');
+      showToast('Diseño listo', 'success');
+    };
+    
+    const onFail = () => {
+      if (loaded) return;
+      loaded = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      spinnerEl.classList.add('hidden');
+      fallbackEl.classList.remove('hidden');
+      promptEl.textContent = 'Tardo en generarse. Abrila en nueva pestaña.';
+    };
+    
+    loader.onload = onDone;
+    loader.onerror = onFail;
+    loader.src = imageUrl;
+    timeoutId = setTimeout(() => { if (!loaded) onFail(); }, 30000);
+    
+  } catch(e) {
+    spinnerEl.classList.add('hidden');
+    fallbackEl.classList.remove('hidden');
+    promptEl.textContent = 'Error. Intenta de nuevo.';
+    showToast('Error generando diseño', 'error');
+  }
+}
+
+async function generateCampaignImage() {
+  if (!currentCampaignProductId) return;
+  const style = document.getElementById('campaign-image-style').value;
+  const usage = document.getElementById('campaign-image-usage').value;
+  const design = document.getElementById('campaign-image-design').value;
+  const resultDiv = document.getElementById('campaign-image-result');
+  const imgEl = document.getElementById('campaign-generated-img');
+  const spinnerEl = document.getElementById('campaign-img-spinner');
+  const fallbackEl = document.getElementById('campaign-img-fallback');
+  const fallbackLink = document.getElementById('campaign-img-fallback-link');
+  const viewLink = document.getElementById('campaign-img-view-link');
+  const promptEl = document.getElementById('campaign-image-prompt');
+  
+  resultDiv.classList.remove('hidden');
+  imgEl.src = '';
+  imgEl.classList.add('opacity-0');
+  spinnerEl.classList.remove('hidden');
+  fallbackEl.classList.add('hidden');
+  promptEl.textContent = 'Solicitando diseño...';
+  
+  try {
+    const url = API + '/products/' + currentCampaignProductId + '/generate-campaign-image?style=' + style + '&usage=' + usage + '&design_type=' + design;
+    const r = await fetch(url);
+    const d = await r.json();
+    currentCampaignImageUrl = d.image_url;
+    
+    if (fallbackLink) fallbackLink.href = d.image_url;
+    if (viewLink) viewLink.href = d.image_url;
+    
+    promptEl.textContent = (d.design_type || design) + ' · ' + (d.source || '') + ' · Generando...';
+    
+    const loader = new Image();
+    let loaded = false;
+    let timeoutId = null;
+    
+    const onDone = () => {
+      if (loaded) return;
+      loaded = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      spinnerEl.classList.add('hidden');
+      imgEl.src = d.image_url;
+      imgEl.classList.remove('opacity-0');
+      fallbackEl.classList.add('hidden');
+      const note = d.note ? d.note.substring(0, 60) : '';
+      promptEl.textContent = (d.design_type || design) + ' · ' + (d.source || '') + ' · ' + note;
+      showToast('Diseño listo', 'success');
+    };
+    
+    const onFail = () => {
+      if (loaded) return;
+      loaded = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      spinnerEl.classList.add('hidden');
+      fallbackEl.classList.remove('hidden');
+      promptEl.textContent = 'Tardo en generarse. Abrila en nueva pestaña.';
+    };
+    
+    loader.onload = onDone;
+    loader.onerror = onFail;
+    loader.src = d.image_url;
+    
+    timeoutId = setTimeout(() => {
+      if (!loaded) onFail();
+    }, 30000);
+    
+  } catch(e) {
+    spinnerEl.classList.add('hidden');
+    fallbackEl.classList.remove('hidden');
+    promptEl.textContent = 'Error generando diseño. Intenta de nuevo.';
+    showToast('Error generando diseño', 'error');
+  }
+}
+
+function downloadCampaignImage() {
+  if (!currentCampaignImageUrl) return;
+  const link = document.createElement('a');
+  link.href = currentCampaignImageUrl;
+  link.download = 'campaign-image-' + Date.now() + '.png';
+  link.target = '_blank';
+  link.click();
+  showToast('Descargando imagen...', 'success');
+}
+
+function copyCampaignImageUrl() {
+  if (!currentCampaignImageUrl) return;
+  navigator.clipboard.writeText(currentCampaignImageUrl).then(() => showToast('URL copiada', 'success'));
+}
+
+function copyCampaignContent() {
+  if (currentCampaignContent) {
+    navigator.clipboard.writeText(currentCampaignContent).then(() => showToast('Contenido copiado', 'success'));
+  }
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('Copiado al portapapeles', 'success'));
+}
+
+function downloadHtml(filename, html) {
+  const blob = new Blob([html], {type: 'text/html'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename + '.html';
+  link.click();
+  showToast('HTML descargado', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  loadStats();
+  showToast('🚀 UY Import Ops v5.1 cargado', 'success', 2000);
+});
+</script>
+</body>
+</html>
