@@ -483,11 +483,22 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
                     price = 0
                 
                 if title and len(title) > 5:
+                    # Resolve Bing redirect URLs to actual product URLs
+                    resolved_url = url
+                    if 'bing.com' in url and '/aclk?' in url:
+                        try:
+                            import httpx
+                            async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as redirect_client:
+                                resp = await redirect_client.head(url, headers={"User-Agent": "Mozilla/5.0"})
+                                resolved_url = str(resp.url)
+                        except:
+                            pass  # Keep Bing URL if redirect fails
+
                     products.append({
                         "name": title[:150],
                         "price_usd": round(price, 2) if price > 0 else 0,
                         "image_url": img if img.startswith('http') else '',
-                        "product_url": url if url.startswith('http') else f"https://www.bing.com{url}",
+                        "product_url": resolved_url if resolved_url.startswith('http') else f"https://www.bing.com{url}",
                         "source": "bing-shopping",
                         "rating": 0,
                         "sold_count": 0,
@@ -499,7 +510,7 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
                 titles = re.findall(r'class="[^"]*(?:title|prod)[^"]*"[^>]*>([^<]{10,200})</', html)
                 prices = re.findall(r'''["']?(?:price|cost)["']?\s*[:=]\s*["']?([0-9]+[.,]?[0-9]*)["']?''', html, re.I)
                 imgs = re.findall(r'"?(https?://[^"\s]+\.(?:jpg|jpeg|png|webp))"?', html)
-                
+
                 for i, title in enumerate(titles[:limit]):
                     title_clean = re.sub(r'<[^>]+>', '', title).strip()
                     p = float(prices[i].replace(',', '')) if i < len(prices) else 0
@@ -510,18 +521,16 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
                         "name": title_clean[:150],
                         "price_usd": round(p, 2) if p > 0 else 0,
                         "image_url": img,
-                        "product_url": f"https://www.bing.com/shop?q={query.replace(' ', '+')}",
+                        "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
                         "source": "bing-shopping-fallback",
                         "rating": 0,
                         "sold_count": 0,
                     })
-            
-            return products[:limit]
+
+        return products[:limit]
     except Exception as e:
         print(f"[Bing Shopping] Error: {e}")
         return []
-
-async def search_bing_web_products(query: str, limit: int = 20) -> List[Dict]:
     """Fallback: Bing Web search with product-oriented extraction."""
     search_url = f"https://www.bing.com/search?q={query.replace(' ', '+')}+buy+price"
     headers = {

@@ -953,9 +953,10 @@ def list_products(
              "best_strategy": p.best_strategy,
              "best_margin": p.best_margin,
              "status": p.status, "opportunity_score": p.opportunity_score,
-             "image_url": p.image_url, "demand_score": p.demand_score,
-             "ml_competitor_price": p.ml_competitor_price,
-             "created_at": p.created_at.isoformat() if p.created_at else None}
+ "image_url": p.image_url, "demand_score": p.demand_score,
+ "ml_competitor_price": p.ml_competitor_price,
+ "source_url": p.source_url,
+ "created_at": p.created_at.isoformat() if p.created_at else None}
             for p in prods]
 
 
@@ -1920,7 +1921,7 @@ async def get_trending_products(
                 continue
             if max_cost is not None and cost > max_cost:
                 continue
-            
+ 
             # Try to enrich with real product image
             img = r.get("image_url", "")
             if not img:
