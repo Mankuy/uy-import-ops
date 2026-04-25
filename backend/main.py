@@ -411,42 +411,6 @@ NICHE_DESCRIPTIONS = {
 }
 
 WINNING_NICHES = []
-for n in TRENDING_NICHES_DATA:
-    cat = n["cat"]
-    name = n["name"]
-    cost = n["cost"]
-    ship = n["ship"]
-    ml = n["ml"]
-    demand = n["demand"]
-    
-    # Calculate profit metrics
-    est_margin = ((ml * 0.5) - (cost + ship) * 42) / ((cost + ship) * 42) * 100 if (cost + ship) > 0 else 0
-    profit_score = min(100, int(demand * 0.4 + max(0, est_margin) * 0.6))
-    
-    # Trend direction based on demand
-    trend = "🔥 Fuerte alza" if demand >= 85 else "📈 Creciendo" if demand >= 70 else "➡️ Estable"
-    
-    # Estimated rating based on category
-    est_rating = 4.2 + (demand / 1000) if demand > 50 else 4.0
-    
-    enriched = {
-        **n,
-        "cost_usd": cost,
-        "ship_usd": ship,
-        "ml_avg": ml,
-        "img": CATEGORY_IMAGES.get(cat, CATEGORY_IMAGES["tecnologia"]),
-        "desc": NICHE_DESCRIPTIONS.get(name, f"Producto en tendencia. Demanda: {demand}/100. Margen estimado: {est_margin:.0f}%"),
-        "source_url": f"https://www.aliexpress.com/wholesale?SearchText={name.replace(' ', '+')}",
-        "keywords": NICHE_KEYWORDS.get(cat, ""),
-        "season": NICHE_SEASONS.get(cat, "Todo el año"),
-        "trend": trend,
-        "profit_score": profit_score,
-        "est_rating": round(est_rating, 1),
-        "est_reviews": int(demand * 15 + 50),
-        "competition_level": "Alta" if demand >= 85 else "Media" if demand >= 65 else "Baja",
-        "margin_potential": f"{est_margin:.0f}%",
-    }
-    WINNING_NICHES.append(enriched)
 
 # ═══════════════════════════════════════════════════════════════
 # DB MODELS
