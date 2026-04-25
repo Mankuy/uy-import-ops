@@ -606,16 +606,16 @@
             </div>
             <div class="flex flex-wrap gap-3 mt-3">
               <div class="flex items-center gap-2">
-                <label class="text-[10px] text-slate-500 uppercase font-bold">Costo min $</label>
-                <input type="number" id="hunter-min-cost" placeholder="0" min="0" step="1"
-                  class="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
-                  onchange="loadNiches(1)">
-              </div>
-              <div class="flex items-center gap-2">
-                <label class="text-[10px] text-slate-500 uppercase font-bold">Costo max $</label>
-                <input type="number" id="hunter-max-cost" placeholder="∞" min="0" step="1"
-                  class="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
-                  onchange="loadNiches(1)">
+<label class="text-[10px] text-slate-500 uppercase font-bold">Costo min USD</label>
+    <input type="number" id="hunter-min-cost" placeholder="0" min="0" step="1"
+    class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+    onchange="loadNiches(1)">
+    </div>
+    <div class="flex items-center gap-2">
+    <label class="text-[10px] text-slate-500 uppercase font-bold">Costo max USD</label>
+    <input type="number" id="hunter-max-cost" placeholder="∞" min="0" step="1"
+    class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+    onchange="loadNiches(1)">
               </div>
               <div class="flex items-center gap-2 ml-auto">
                 <span id="hunter-source-badge" class="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-400 hidden"></span>
@@ -1897,11 +1897,14 @@ async function loadNiches(page = 1) {
       const season = n.season || 'Todo el año';
       const marginPotential = n.margin_potential || (isLive ? '~70%' : '~50%');
       const trend = n.trend || (isLive ? '📈 En tendencia' : '➡️ Estable');
-      const cost = n.cost_usd || n.cost || n.price_usd || 0;
-      const ship = n.ship_usd || n.ship || 3.5;
-      const ml = n.ml_avg || n.ml || (cost * 2.5);
-      const keywords = n.keywords || (isLive ? 'import,china,aliexpress' : 'producto');
-      const sourceUrl = n.source_url || n.url || `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(n.name)}`;
+const cost = n.cost_usd || n.cost || n.price_usd || 0;
+const ship = n.ship_usd || n.ship || 3.5;
+const ml = n.ml_avg || n.ml || 0;
+const mlUyu = ml > 0 ? ml : Math.round(cost * 2.5 * 42);
+const keywords = n.keywords || (isLive ? 'import,china,aliexpress' : 'producto');
+const sourceUrl = n.source_url || '';
+const hasRealLink = sourceUrl && sourceUrl.includes('/item') || sourceUrl.includes('/product') || sourceUrl.includes('/p/') || (sourceUrl.includes('aliexpress') && sourceUrl !== `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(n.name)}`);
+const searchUrl = `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(n.name)}`;
       
       return `
       <div class="product-card glass rounded-2xl overflow-hidden gradient-border flex flex-col" style="animation: slideUp 0.4s ease-out ${i * 0.05}s both;">
@@ -1935,29 +1938,29 @@ async function loadNiches(page = 1) {
             <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700" title="Margen">📈 ${marginPotential}</span>
           </div>
           
-          <div class="grid grid-cols-3 gap-2 mb-3 text-center">
-            <div class="bg-slate-800/50 rounded-lg p-2">
-              <p class="text-[10px] text-slate-500">Costo</p>
-              <p class="text-sm font-bold text-white">$${cost}</p>
-            </div>
-            <div class="bg-slate-800/50 rounded-lg p-2">
-              <p class="text-[10px] text-slate-500">Flete</p>
-              <p class="text-sm font-bold text-white">$${ship}</p>
-            </div>
-            <div class="bg-slate-800/50 rounded-lg p-2">
-              <p class="text-[10px] text-slate-500">ML ~</p>
-              <p class="text-sm font-bold text-brand-400">$${ml}</p>
-            </div>
-          </div>
+<div class="grid grid-cols-3 gap-2 mb-3 text-center">
+    <div class="bg-slate-800/50 rounded-lg p-2">
+    <p class="text-[10px] text-slate-500">Costo USD</p>
+    <p class="text-sm font-bold text-white">US$${cost}</p>
+    </div>
+    <div class="bg-slate-800/50 rounded-lg p-2">
+    <p class="text-[10px] text-slate-500">Flete USD</p>
+    <p class="text-sm font-bold text-white">US$${ship}</p>
+    </div>
+    <div class="bg-slate-800/50 rounded-lg p-2">
+    <p class="text-[10px] text-slate-500">ML ${ml > 0 ? 'UYU' : '~est.'}</p>
+    <p class="text-sm font-bold text-brand-400">$${ml > 0 ? ml : mlUyu}</p>
+    </div>
+    </div>
           
           <div class="mt-auto pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
             <div class="flex gap-1.5 overflow-hidden">
               ${(n.keywords || '').split(',').slice(0,3).map(k => `<span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-400 truncate">${k.trim()}</span>`).join('')}
             </div>
             <div class="flex gap-1.5 shrink-0">
-              <a href="${sourceUrl}" target="_blank" title="Buscar en AliExpress" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1.5 rounded-lg font-semibold transition">🔍</a>
+              <a href="${hasRealLink ? sourceUrl : searchUrl}" target="_blank" title="${hasRealLink ? 'Ver producto' : 'Buscar en AliExpress'}" class="text-xs ${hasRealLink ? 'bg-brand-700 hover:bg-brand-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'} px-2 py-1.5 rounded-lg font-semibold transition">${hasRealLink ? '🔗' : '🔍'}</a>
               <button onclick="saveNicheToProducts(${i})" class="text-xs bg-accent-600 hover:bg-accent-500 text-white px-3 py-1.5 rounded-lg font-bold transition shadow-lg shadow-accent-600/20">+ Guardar</button>
-              <button onclick="addNicheToCalc('${n.name.replace(/'/g, "\\'")}', ${cost}, ${ship}, ${ml})" class="text-xs bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 px-2 py-1.5 rounded-lg font-semibold transition" title="Calcular">💰</button>
+<button onclick="addNicheToCalc('${n.name.replace(/'/g, "\\\\'")}', ${cost}, ${ship}, ${mlUyu})" class="text-xs bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 px-2 py-1.5 rounded-lg font-semibold transition" title="Calcular">💰</button>
             </div>
           </div>
         </div>
@@ -1995,40 +1998,45 @@ function addNicheToCalc(name, cost, ship, ml) {
 }
 
 async function saveNicheToProducts(index) {
-  const n = window.hunterNiches[index];
-  if (!n) return;
-  
-  // Use the image already found by the hunter (real photo or fallback)
-  const realImg = n.img || '';
-  
-  try {
-    const body = {
-      name: n.name,
-      description: n.desc || '',
-      product_cost_usd: n.cost_usd || n.cost,
-      shipping_cost_usd: n.ship_usd || n.ship,
-      ml_competitor_price: n.ml_avg || n.ml,
-      image_url: realImg,
-      source_url: n.source_url || '',
-      status: 'researching',
-      category: n.cat || 'tecnologia',
-    };
-    const r = await fetch(API + '/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await r.json();
-    showToast('Guardado: ' + n.name + ' — ' + data.best_strategy + ' ' + Math.round(data.best_margin) + '%', 'success');
-    loadStats();
-    document.getElementById('filter-status').value = '';
-    document.getElementById('filter-margin').value = '';
-    document.getElementById('filter-strategy').value = '';
-    showTab('products');
-  } catch(e) {
-    console.error(e);
-    showToast('Error guardando producto', 'error');
-  }
+const n = window.hunterNiches[index];
+if (!n) return;
+
+// Use the image already found by the hunter (real photo or fallback)
+const realImg = n.img || '';
+const costUsd = n.cost_usd || n.cost || 0;
+const shipUsd = n.ship_usd || n.ship || 0;
+const mlPrice = n.ml_avg || n.ml || 0;
+// Convert ML price to UYU if it seems like USD (ml_avg from backend is already in UYU from the formula)
+const mlCompetitorPrice = mlPrice > 0 ? mlPrice : 0;
+
+try {
+const body = {
+name: n.name,
+description: n.desc || '',
+product_cost_usd: costUsd,
+shipping_cost_usd: shipUsd,
+ml_competitor_price: mlCompetitorPrice,
+image_url: realImg,
+source_url: n.source_url || '',
+status: 'researching',
+category: n.cat || 'tecnologia',
+};
+const r = await fetch(API + '/products', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(body)
+});
+const data = await r.json();
+showToast('Guardado: ' + n.name + ' — ' + data.best_strategy + ' ' + Math.round(data.best_margin) + '%', 'success');
+loadStats();
+document.getElementById('filter-status').value = '';
+document.getElementById('filter-margin').value = '';
+document.getElementById('filter-strategy').value = '';
+showTab('products');
+} catch(e) {
+console.error(e);
+showToast('Error guardando producto', 'error');
+}
 }
 
 // ═══════════════════════════════════════════════════════════════
