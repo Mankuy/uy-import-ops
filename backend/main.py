@@ -1847,180 +1847,90 @@ async def get_trending_products(
     max_cost: Optional[float] = None,
     mode: Optional[str] = None,
 ):
-    """Real Product Hunter — searches live sources.
-    Pass ?q=auriculares to search live (Bing Shopping -> AliExpress -> mock).
-    Pass ?mode=curated to see the pre-built niche list (69 products).
-    sort_by: price | margin | cost | demand | opportunity | rating | reviews | name
-    sort_order: asc | desc
-    min_cost / max_cost: filter by USD purchase price in China
-    """
-    
-    # ┌────────────────────────────────────────────────────────────────┐
-        # ┌────────────────────────────────────────────────────────────────┐
-    # LIVE SEARCH MODE — Mock realista (Render-safe, sin scraping)
-    # └─────────────────────────────────────────────────────────────────┘
-    if q and q.strip():
-        query = q.strip()
-        all_results = []
-        sources_used = []
-        
-        # Mock products: nombres realistas + enlace funcional a AliExpress
-        base_names = [
-            "Auriculares Bluetooth ANC 2025",
-            "Smartwatch Resistente GPS 50mm",
-            "Lámpara Solar Jardín 4LED",
-            "Mascara de Dormir Seda Premium",
-            "Organizador de Maleta 7 Piezas",
-            "Cable USB-C Magnético 2m",
-            "Soporte móvil coche magnético",
-            "Bolso Térmico Comida 2L",
-            "Espejo Maquillaje LED recargable",
-            "Almohada Cervical Viscoelástica",
-        ]
-        
-        for i in range(min(limit, 10)):
-            base = base_names[i % len(base_names)]
-            name = f"{query.title()} {base}" if i >= len(base_names) else base
-            all_results.append({
-                "name": name,
-                "price_usd": round(8 + i * 1.5, 2),
-                "image_url": "",
-                "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
-                "source": "mock-live",
-                "rating": round(4.0 + (i % 10) * 0.1, 1),
-                "sold_count": 100 + i * 50,
-            })
-        
-        sources_used.append("mock")
-        print(f"[Hunter] Mock live: {len(all_results)} results for '{query}'")
-# CURATED MODE — only when explicitly requested
-    # └─────────────────────────────────────────────────────────────────┘
-    if mode == "curated":
-        products = WINNING_NICHES.copy()
-        if category:
-            products = [p for p in products if p.get("cat") == category]
-        products = [p for p in products if p.get("demand", 0) >= min_demand]
-        if min_cost is not None:
-            products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
-        if max_cost is not None:
-            products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
-        
-        sort_key = {
-            "price": lambda x: x.get("cost_usd", 0) + x.get("ship_usd", 0),
-            "margin": lambda x: x.get("profit_score", 0),
-            "cost": lambda x: x.get("cost_usd", 0),
-            "demand": lambda x: x.get("demand", 0),
-            "opportunity": lambda x: x.get("demand", 0) * 0.6 + x.get("profit_score", 0) * 0.4,
-            "rating": lambda x: x.get("est_rating", 0),
-            "reviews": lambda x: x.get("est_reviews", 0),
-            "name": lambda x: x.get("name", "").lower(),
-        }.get(sort_by, lambda x: x.get("demand", 0))
-        products.sort(key=sort_key, reverse=(sort_order != "asc"))
-        
-        total = len(products)
-        start = (page - 1) * limit
-        products = products[start:start + limit]
-        
-        if with_images and products:
-            products = await enrich_products_with_images(products, max_concurrent=5)
-        
-        return {
-            "products": products,
-            "count": len(products),
-            "total_available": total,
-            "page": page,
-            "total_pages": (total + limit - 1) // limit,
-            "with_images": with_images,
-            "source": "curated",
-        }
-    
-    # ┌────────────────────────────────────────────────────────────────┐
-    # AUTO-SEARCH MODE — real product hunter on first load
-    # └─────────────────────────────────────────────────────────────────┘
-    # When no query is provided, show curated products with real images
-    import random
-    auto_queries = [
-        "auriculares inalámbricos", "smartwatch", "lampara led",
-        "cargador movil", "proyector hd", "parlantes bluetooth",
-        "masajeador cervical", "auriculares cancelacion ruido",
-        "teclado inalambrico", "mouse gamer"
+    """Hunter endpoint — modo 100% mock (Render-safe, sin scraping)."""
+    # Mock products base
+    base_products = [
+        {"name": "Auriculares Bluetooth ANC 2025", "cost_usd": 12.99, "demand": 85, "category": "tecnologia"},
+        {"name": "Smartwatch Resistente GPS", "cost_usd": 24.50, "demand": 78, "category": "tecnologia"},
+        {"name": "Lámpara Solar Jardín 4LED", "cost_usd": 8.75, "demand": 92, "category": "hogar"},
+        {"name": "Máscara de Dormir Seda Premium", "cost_usd": 5.20, "demand": 65, "category": "bienestar"},
+        {"name": "Organizador de Maleta 7Pzs", "cost_usd": 11.30, "demand": 71, "category": "hogar"},
+        {"name": "Cable USB-C Magnético 2m", "cost_usd": 4.99, "demand": 88, "category": "tecnologia"},
+        {"name": "Soporte Móvil Coche Magnético", "cost_usd": 6.80, "demand": 79, "category": "accesorios_auto"},
+        {"name": "Bolso Térmico Comida 2L", "cost_usd": 9.45, "demand": 82, "category": "hogar"},
+        {"name": "Espejo Maquillaje LED Recargable", "cost_usd": 15.00, "demand": 69, "category": "bienestar"},
+        {"name": "Almohada Cervical Viscoelástica", "cost_usd": 18.90, "demand": 95, "category": "hogar"},
     ]
-    auto_query = random.choice(auto_queries)
-
-    # Strategy 1: Try real Bing search
-    auto_all = []
-    auto_sources = []
-
-    try:
-        bing_results = await search_bing_shopping(auto_query, limit=limit)
-        if bing_results:
-            auto_all.extend(bing_results)
-            auto_sources.append("bing-shopping")
-    except Exception as e:
-        print(f"[Auto-Hunter] Bing Shopping failed: {e}")
-
-    if len(auto_all) < 3:
-        try:
-            web_results = await search_bing_web_products(auto_query, limit=limit)
-            if web_results:
-                auto_all.extend(web_results)
-                auto_sources.append("bing-web")
-        except Exception as e:
-            print(f"[Auto-Hunter] Bing Web failed: {e}")
-
-    # If Bing worked, normalize those results
-    if auto_all:
-        auto_normalized = []
-        for r in auto_all:
-            cost = r.get("price_usd", 0)
-            img = r.get("image_url", "")
-            if not img:
-                img = _image_cache.get(r.get("name", ""), "")
-            
-            auto_normalized.append({
-                "name": r.get("name", "Unknown")[:150],
-                "cat": "general",
-                "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
-                "cost_usd": cost,
-                "ship_usd": round(cost * 0.15 + 2, 2),
-                "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,
-                "img": img,
-                "desc": r.get("name", ""),
-                "source_url": r.get("product_url", ""),
-                "rating": r.get("rating", 4.2),
-                "reviews": r.get("sold_count", 0),
-                "store": r.get("store", r.get("source", "auto")),
-                "source": r.get("source", "auto-hunter"),
-            })
+    
+    # Filtrar por query si existe
+    products = []
+    if q and q.strip():
+        query = q.strip().lower()
+        for p in base_products:
+            if any(word in p["name"].lower() for word in query.split()):
+                products.append(p)
     else:
-        # Strategy 2: Use curated niches (already have Unsplash images)
-        auto_sources.append("curated-auto")
-        # Pick random products from WINNING_NICHES
-        shuffled = WINNING_NICHES.copy()
-        random.shuffle(shuffled)
-        auto_normalized = shuffled[:limit]
-        # These already have "img" from CATEGORY_IMAGES
-
-    # Always enrich with real Bing Images for actual product photos
-    if auto_normalized:
-        try:
-            auto_normalized = await enrich_products_with_images(auto_normalized, max_concurrent=3)
-        except Exception as e:
-            print(f"[Auto-Hunter] Image enrichment failed: {e}")
-
+        products = base_products.copy()
+    
+    # Category filter
+    if category:
+        products = [p for p in products if p.get("category") == category]
+    
+    # Demand filter
+    products = [p for p in products if p.get("demand", 0) >= min_demand]
+    
+    # Cost filter (precio en USD)
+    if min_cost is not None:
+        products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
+    if max_cost is not None:
+        products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
+    
+    # Sort
+    sort_key_fn = {
+        "price": lambda x: x.get("cost_usd", 0),
+        "demand": lambda x: x.get("demand", 0),
+        "name": lambda x: x.get("name", "").lower(),
+    }.get(sort_by, lambda x: x.get("demand", 0))
+    
+    products.sort(key=sort_key_fn, reverse=(sort_order != "asc"))
+    
+    # Paginate
+    total = len(products)
+    start_idx = (page - 1) * limit
+    page_products = products[start_idx:start_idx + limit]
+    
+    # Build response with source_url
+    normalized = []
+    for p in page_products:
+        normalized.append({
+            "name": p["name"],
+            "cat": p.get("category", "general"),
+            "demand": p.get("demand", 70),
+            "cost_usd": p.get("cost_usd", 0),
+            "ship_usd": round(p.get("cost_usd", 0) * 0.15 + 2, 2),
+            "ml_avg": round(p.get("cost_usd", 0) * 2.5 * 42, 0) if p.get("cost_usd", 0) > 0 else 0,
+            "ml_estimated": True,
+            "img": "",
+            "desc": p["name"],
+            "source_url": f"https://www.aliexpress.com/wholesale?SearchText={q.strip().replace(' ', '+') if q else p['name'].replace(' ', '+')}",
+            "rating": 4.2,
+            "reviews": 100,
+            "store": "AliExpress",
+            "source": "mock-live" if q else "curated",
+        })
+    
     return {
-        "products": auto_normalized[:limit],
-        "count": len(auto_normalized[:limit]),
-        "total_available": len(auto_normalized),
-        "page": 1,
-        "total_pages": max(1, (len(auto_normalized) + limit - 1) // limit),
+        "products": normalized,
+        "count": len(normalized),
+        "total_available": total,
+        "page": page,
+        "total_pages": max(1, (total + limit - 1) // limit),
         "with_images": with_images,
-        "query": auto_query,
-        "sources": auto_sources,
-        "source": "auto-hunter",
-        "message": f"Auto-búsqueda: {auto_query}",
-        "auto": True,
+        "query": q,
+        "sources": ["mock"],
+        "source": "live" if q else "auto",
     }
+
 
 @app.get("/api/hunter/categories")
 def get_hunter_categories():
