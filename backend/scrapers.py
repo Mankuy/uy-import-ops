@@ -458,7 +458,7 @@ async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
     }
     try:
         import httpx
-        async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client:
             resp = await client.get(search_url, headers=headers)
             if resp.status_code != 200:
                 return []
