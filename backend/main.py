@@ -1856,51 +1856,43 @@ async def get_trending_products(
     """
     
     # ┌────────────────────────────────────────────────────────────────┐
-    # LIVE SEARCH MODE — the real hunter
-    # └─────────────────────────────────────────────────────────────────┘
         # ┌────────────────────────────────────────────────────────────────┐
-    # LIVE SEARCH MODE — AliExpress directo + fallback mock realista
+    # LIVE SEARCH MODE — Mock realista (Render-safe, sin scraping)
     # └─────────────────────────────────────────────────────────────────┘
     if q and q.strip():
         query = q.strip()
         all_results = []
         sources_used = []
         
-        # Step 1: AliExpress directo (Playwright) — puede fallar en Render por memoria
-        try:
-            hunter = ProductHunter()
-            ali_results = await hunter.search_aliexpress(query, limit)
-            if ali_results:
-                for r in ali_results:
-                    all_results.append({
-                        "name": r.get("name", "Unknown"),
-                        "price_usd": r.get("price_usd", 0),
-                        "image_url": r.get("image_url", ""),
-                        "product_url": r.get("product_url", ""),
-                        "source": "aliexpress",
-                        "rating": r.get("rating", 0),
-                        "sold_count": r.get("sold_count", 0),
-                    })
-                sources_used.append("aliexpress")
-                print(f"[Hunter] AliExpress: {len(ali_results)} results")
-        except Exception as e:
-            print(f"[Hunter] AliExpress failed: {e}")
+        # Mock products: nombres realistas + enlace funcional a AliExpress
+        base_names = [
+            "Auriculares Bluetooth ANC 2025",
+            "Smartwatch Resistente GPS 50mm",
+            "Lámpara Solar Jardín 4LED",
+            "Mascara de Dormir Seda Premium",
+            "Organizador de Maleta 7 Piezas",
+            "Cable USB-C Magnético 2m",
+            "Soporte móvil coche magnético",
+            "Bolso Térmico Comida 2L",
+            "Espejo Maquillaje LED recargable",
+            "Almohada Cervical Viscoelástica",
+        ]
         
-        # Step 2: Mock fallback — enlaces reales a AliExpress wholesale search
-        if len(all_results) < limit:
-            mock_count = min(limit - len(all_results), 10)
-            for i in range(mock_count):
-                all_results.append({
-                    "name": f"{query.title()} Producto {i+1}",
-                    "price_usd": round(10 + i * 2.5, 2),
-                    "image_url": "",
-                    "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
-                    "source": "mock-fallback",
-                    "rating": 4.0 + (i % 10) * 0.1,
-                    "sold_count": 100 + i * 50,
-                })
-            sources_used.append("mock")
-            print(f"[Hunter] Mock fallback: {mock_count} results")
+        for i in range(min(limit, 10)):
+            base = base_names[i % len(base_names)]
+            name = f"{query.title()} {base}" if i >= len(base_names) else base
+            all_results.append({
+                "name": name,
+                "price_usd": round(8 + i * 1.5, 2),
+                "image_url": "",
+                "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
+                "source": "mock-live",
+                "rating": round(4.0 + (i % 10) * 0.1, 1),
+                "sold_count": 100 + i * 50,
+            })
+        
+        sources_used.append("mock")
+        print(f"[Hunter] Mock live: {len(all_results)} results for '{query}'")
 # CURATED MODE — only when explicitly requested
     # └─────────────────────────────────────────────────────────────────┘
     if mode == "curated":
