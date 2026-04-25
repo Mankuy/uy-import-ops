@@ -2027,7 +2027,7 @@ async def get_trending_products(
     # ┌────────────────────────────────────────────────────────────────┐
     # AUTO-SEARCH MODE — real product hunter on first load
     # └─────────────────────────────────────────────────────────────────┘
-    # When no query is provided, auto-search trending product categories
+    # When no query is provided, show curated products with real images
     import random
     auto_queries = [
         "auriculares inalámbricos", "smartwatch", "lampara led",
@@ -2037,11 +2037,10 @@ async def get_trending_products(
     ]
     auto_query = random.choice(auto_queries)
 
-    # Run the same live search pipeline as a real query would
+    # Strategy 1: Try real Bing search
     auto_all = []
     auto_sources = []
 
-    # Step 1: Bing Shopping (HTTP-only, works on Render)
     try:
         bing_results = await search_bing_shopping(auto_query, limit=limit)
         if bing_results:
@@ -2050,7 +2049,6 @@ async def get_trending_products(
     except Exception as e:
         print(f"[Auto-Hunter] Bing Shopping failed: {e}")
 
-    # Step 2: Bing Web fallback
     if len(auto_all) < 3:
         try:
             web_results = await search_bing_web_products(auto_query, limit=limit)
@@ -2060,33 +2058,45 @@ async def get_trending_products(
         except Exception as e:
             print(f"[Auto-Hunter] Bing Web failed: {e}")
 
-    # Normalize auto-search results
-    auto_normalized = []
-    for r in auto_all:
-        cost = r.get("price_usd", 0)
-        img = r.get("image_url", "")
-        if not img:
-            img = _image_cache.get(r.get("name", ""), "")
-        
-        auto_normalized.append({
-            "name": r.get("name", "Unknown")[:150],
-            "cat": "general",
-            "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
-            "cost_usd": cost,
-            "ship_usd": round(cost * 0.15 + 2, 2),
-            "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,
-            "img": img,
-            "desc": r.get("name", ""),
-            "source_url": r.get("product_url", ""),
-            "rating": r.get("rating", 4.2),
-            "reviews": r.get("sold_count", 0),
-            "store": r.get("store", r.get("source", "auto")),
-            "source": r.get("source", "auto-hunter"),
-        })
+    # If Bing worked, normalize those results
+    if auto_all:
+        auto_normalized = []
+        for r in auto_all:
+            cost = r.get("price_usd", 0)
+            img = r.get("image_url", "")
+            if not img:
+                img = _image_cache.get(r.get("name", ""), "")
+            
+            auto_normalized.append({
+                "name": r.get("name", "Unknown")[:150],
+                "cat": "general",
+                "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
+                "cost_usd": cost,
+                "ship_usd": round(cost * 0.15 + 2, 2),
+                "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,
+                "img": img,
+                "desc": r.get("name", ""),
+                "source_url": r.get("product_url", ""),
+                "rating": r.get("rating", 4.2),
+                "reviews": r.get("sold_count", 0),
+                "store": r.get("store", r.get("source", "auto")),
+                "source": r.get("source", "auto-hunter"),
+            })
+    else:
+        # Strategy 2: Use curated niches (already have Unsplash images)
+        auto_sources.append("curated-auto")
+        # Pick random products from WINNING_NICHES
+        shuffled = WINNING_NICHES.copy()
+        random.shuffle(shuffled)
+        auto_normalized = shuffled[:limit]
+        # These already have "img" from CATEGORY_IMAGES
 
-    # Enrich with real images from Bing if requested
-    if with_images and auto_normalized:
-        auto_normalized = await enrich_products_with_images(auto_normalized, max_concurrent=5)
+    # Always enrich with real Bing Images for actual product photos
+    if auto_normalized:
+        try:
+            auto_normalized = await enrich_products_with_images(auto_normalized, max_concurrent=3)
+        except Exception as e:
+            print(f"[Auto-Hunter] Image enrichment failed: {e}")
 
     return {
         "products": auto_normalized[:limit],
