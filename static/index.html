@@ -607,15 +607,15 @@
             <div class="flex flex-wrap gap-3 mt-3">
               <div class="flex items-center gap-2">
 <label class="text-[10px] text-slate-500 uppercase font-bold">Costo min USD</label>
-    <input type="number" id="hunter-min-cost" placeholder="0" min="0" step="1"
-    class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
-    onchange="loadNiches(1)">
-    </div>
-    <div class="flex items-center gap-2">
-    <label class="text-[10px] text-slate-500 uppercase font-bold">Costo max USD</label>
-    <input type="number" id="hunter-max-cost" placeholder="∞" min="0" step="1"
-    class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
-    onchange="loadNiches(1)">
+ <input type="number" id="hunter-min-cost" placeholder="0" min="0" step="1"
+ class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+ oninput="debounceHunterFilter()" onchange="loadNiches(1)">
+ </div>
+ <div class="flex items-center gap-2">
+ <label class="text-[10px] text-slate-500 uppercase font-bold">Costo max USD</label>
+ <input type="number" id="hunter-max-cost" placeholder="∞" min="0" step="1"
+ class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+ oninput="debounceHunterFilter()" onchange="loadNiches(1)">
               </div>
               <div class="flex items-center gap-2 ml-auto">
                 <span id="hunter-source-badge" class="text-[10px] px-2 py-1 rounded bg-slate-700 text-slate-400 hidden"></span>
@@ -1526,14 +1526,18 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     openAddModal();
   }
-  // 1-5 = Switch tabs
-  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-    const tabs = ['dashboard', 'hunter', 'products', 'calculator', 'mlsearch', 'tracking', 'marketing'];
-    const num = parseInt(e.key);
-    if (num >= 1 && num <= 7) {
-      showTab(tabs[num - 1]);
-    }
-  }
+ // 1-7 = Switch tabs (only if NOT typing in an input)
+ if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+ const active = document.activeElement;
+ const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA');
+ if (!isTyping) {
+ const tabs = ['dashboard', 'hunter', 'products', 'calculator', 'mlsearch', 'tracking', 'marketing'];
+ const num = parseInt(e.key);
+ if (num >= 1 && num <= 7) {
+ showTab(tabs[num - 1]);
+ }
+ }
+ }
   // Escape = Close modal
   if (e.key === 'Escape') {
     closeAddModal();
@@ -1796,6 +1800,12 @@ function getCategoryGradient(cat) {
 window.hunterPage = 1;
 window.hunterLimit = 20;
 window.hunterNiches = [];
+window._hunterFilterTimer = null;
+
+function debounceHunterFilter() {
+ clearTimeout(window._hunterFilterTimer);
+ window._hunterFilterTimer = setTimeout(() => loadNiches(1), 600);
+}
 
 function clearHunterSearch() {
   const searchInput = document.getElementById('hunter-search');
@@ -2125,16 +2135,19 @@ function renderProductCard(p, index) {
             <p class="font-bold text-gold-400">$${Math.round(p.price_extreme_uyu)}</p>
           </div>
         </div>
-        <div class="flex justify-between items-center pt-2 border-t border-slate-700/50">
-          <span class="text-[10px] text-slate-500 uppercase font-bold">${p.best_strategy.replace('_', ' ')}</span>
-          <div class="flex gap-1">
-            <button onclick="openProductAnalysis(${p.id})" class="text-slate-500 hover:text-brand-400 transition p-1" title="Analizar">📊</button>
-            <button onclick="deleteProduct(${p.id})" class="text-slate-500 hover:text-danger-400 transition p-1" title="Eliminar">🗑️</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
+ <div class="flex justify-between items-center pt-2 border-t border-slate-700/50">
+ <div class="flex items-center gap-2">
+ <span class="text-[10px] text-slate-500 uppercase font-bold">${p.best_strategy.replace('_', ' ')}</span>
+ ${p.source_url ? `<a href="${p.source_url}" target="_blank" class="text-[10px] px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/30 hover:bg-brand-500/20 transition font-semibold" title="Ver producto en la fuente">🔗 Fuente</a>` : ''}
+ </div>
+ <div class="flex gap-1">
+ <button onclick="openProductAnalysis(${p.id})" class="text-slate-500 hover:text-brand-400 transition p-1" title="Analizar">📊</button>
+ <button onclick="deleteProduct(${p.id})" class="text-slate-500 hover:text-danger-400 transition p-1" title="Eliminar">🗑️</button>
+ </div>
+ </div>
+ </div>
+ </div>
+ `;
 }
 
 async function updateProductStatus(id, status) {
