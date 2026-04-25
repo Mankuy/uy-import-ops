@@ -23,7 +23,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.orm import declarative_base, sessionmaker
 import httpx
 
-from scrapers import ProductHunter, TRENDING_NICHES_DATA, search_bing_shopping, search_bing_web_products, generate_mock_sourcing_data
+# from scrapers import ... (lazy imports inside endpoints)
 
 # ═══════════════════════════════════════════════════════════════
 # IMAGE CACHE — persists across requests and restarts
