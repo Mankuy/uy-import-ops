@@ -600,17 +600,57 @@ def generate_mock_sourcing_data(query: str, limit: int = 20) -> List[Dict]:
     
     products = []
     count = random.randint(3, min(limit, 24))
+    
+    # Realistic product name templates by category
+    product_templates = {
+        "auricular": ["Auriculares Bluetooth TWS", "Auriculares ANC Pro", "Headphones DJ Studio", "Auriculares Deportivos IPX7", "Earbuds HiFi Bass"],
+        "smartwatch": ["Smartwatch Ultra 2", "Reloj Inteligente AMOLED", "Smart Band Pro 2025", "Smartwatch Kids GPS", "Watch Fitness Tracker"],
+        "lampara": ["Lampara LED Escritorio", "Lampara RGB Gamer", "Lampara Solar Jardin", "Tira LED 5M RGB", "Lampara Noche Touch"],
+        "cargador": ["Cargador 65W GaN", "Power Bank 20000mAh", "Cargador MagSafe 15W", "Cargador Auto USB-C", "Cargador Inalambrico 3en1"],
+        "proyector": ["Proyector Full HD 1080p", "Mini Proyector Portatil", "Proyector WiFi 4K", "Proyector Android 11", "Proyector Cine Casa"],
+        "parlante": ["Parlante Bluetooth JBL-style", "Speaker TWS Stereo", "Parlante Bass 30W", "Soundbar TV 2.1", "Parlante Portatil IPX7"],
+        "masaje": ["Masajeador Cervical EMS", "Pistola Masaje 6 Vel", "Almohada Masaje Shiatsu", "Masajeador Espalda Heat", "Rodillo Masaje Pies"],
+        "teclado": ["Teclado Mecanico RGB", "Keyboard 60% Hot-Swap", "Teclado Bluetooth Slim", "Teclado Gaming Macro", "Keyboard Numeric Pad"],
+        "mouse": ["Mouse Gamer 16000DPI", "Mouse Ergonomico Vertical", "Mouse Silent Click", "Mouse Pad RGB XL", "Mouse Tri-Mode WiFi"],
+    }
+    
+    # Find matching template category
+    template_key = None
+    for key in product_templates:
+        if key in q:
+            template_key = key
+            break
+    if template_key is None:
+        template_key = random.choice(list(product_templates.keys()))
+    
+    templates = product_templates[template_key]
+    
+    # Unsplash fallback images by category
+    unsplash_imgs = {
+        "auricular": "https://images.unsplash.com/photo-1505740420928-5e560c327914?w=400&h=400&fit=crop",
+        "smartwatch": "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
+        "lampara": "https://images.unsplash.com/photo-1507473885765-e6ed057ab852?w=400&h=400&fit=crop",
+        "cargador": "https://images.unsplash.com/photo-1583863788434-e58a4e3b0e3e?w=400&h=400&fit=crop",
+        "proyector": "https://images.unsplash.com/photo-1478720528107-ce6441d75447?w=400&h=400&fit=crop",
+        "parlante": "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=400&fit=crop",
+        "masaje": "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=400&fit=crop",
+        "teclado": "https://images.unsplash.com/photo-1587829741301-dc798b116add?w=400&h=400&fit=crop",
+        "mouse": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400&h=400&fit=crop",
+    }
+    fallback_img = unsplash_imgs.get(template_key, "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=400&h=400&fit=crop")
+    
     for i in range(count):
         cost = round(base_cost * random.uniform(0.4, 1.8), 2)
         variant = random.choice(variants)
         seller = sellers[i % len(sellers)]
         rating = round(random.uniform(3.8, 4.9), 1)
         orders = random.randint(50, 5000)
+        product_name = templates[i % len(templates)]
         
         products.append({
-            "name": f"{query.title()} {variant} — {seller}",
+            "name": f"{product_name} {variant}",
             "price_usd": cost,
-            "image_url": "",
+            "image_url": fallback_img,
             "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query.replace(' ', '+')}",
             "product_id": f"MOCK_{seed}_{i}",
             "rating": rating,
