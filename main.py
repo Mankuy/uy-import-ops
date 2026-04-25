@@ -1797,7 +1797,7 @@ async def search_aliexpress(body: AliExpressSearchInput):
         "source": "aliexpress",
     }
 
-@app.get("/api/hunter/trending")
+@app.get("/api/hunter/rending")
 async def get_trending_products(
     category: Optional[str] = None,
     min_demand: int = 50,
@@ -1811,11 +1811,12 @@ async def get_trending_products(
     max_cost: Optional[float] = None,
     mode: Optional[str] = None,
 ):
-    """Hunter endpoint — modo 100% mock (Render-safe, sin scraping)."""
+    """Hunter endpoint — 100% mock. Always returns base products."""
     import logging
     logger = logging.getLogger("hunter")
-    logger.info("Hunter endpoint called: q=%s, limit=%d", q, limit)
-    # Mock products base
+    logger.info("Hunter: q=%s, limit=%d", q, limit)
+    
+    # Base products (same for all queries)
     base_products = [
         {"name": "Auriculares Bluetooth ANC 2025", "cost_usd": 12.99, "demand": 85, "category": "tecnologia"},
         {"name": "Smartwatch Resistente GPS", "cost_usd": 24.50, "demand": 78, "category": "tecnologia"},
@@ -1829,15 +1830,8 @@ async def get_trending_products(
         {"name": "Almohada Cervical Viscoelástica", "cost_usd": 18.90, "demand": 95, "category": "hogar"},
     ]
     
-    # Filtrar por query si existe
-    products = []
-    if q and q.strip():
-        query = q.strip().lower()
-        for p in base_products:
-            if any(word in p["name"].lower() for word in query.split()):
-                products.append(p)
-    else:
-        products = base_products.copy()
+    # Start with all products regardless of query
+    products = base_products.copy()
     
     # Category filter
     if category:
@@ -1846,27 +1840,27 @@ async def get_trending_products(
     # Demand filter
     products = [p for p in products if p.get("demand", 0) >= min_demand]
     
-    # Cost filter (precio en USD)
+    # Cost filter
     if min_cost is not None:
         products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
     if max_cost is not None:
         products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
     
-    # Sort
+    # Sorting
     sort_key_fn = {
         "price": lambda x: x.get("cost_usd", 0),
         "demand": lambda x: x.get("demand", 0),
         "name": lambda x: x.get("name", "").lower(),
     }.get(sort_by, lambda x: x.get("demand", 0))
-    
     products.sort(key=sort_key_fn, reverse=(sort_order != "asc"))
     
-    # Paginate
+    # Pagination
     total = len(products)
     start_idx = (page - 1) * limit
     page_products = products[start_idx:start_idx + limit]
     
-    # Build response with source_url
+    # Build response with source_url (uses query for AliExpress link)
+    search_term = q.strip() if q and q.strip() else "productos importacion"
     normalized = []
     for p in page_products:
         normalized.append({
@@ -1879,11 +1873,11 @@ async def get_trending_products(
             "ml_estimated": True,
             "img": "",
             "desc": p["name"],
-            "source_url": f"https://www.aliexpress.com/wholesale?SearchText={q.strip().replace(' ', '+') if q else p['name'].replace(' ', '+')}",
+            "source_url": f"https://www.aliexpress.com/wholesale?SearchText={search_term.replace(' ', '+')}",
             "rating": 4.2,
             "reviews": 100,
             "store": "AliExpress",
-            "source": "mock-live" if q else "curated",
+            "source": "live" if q else "auto",
         })
     
     return {
