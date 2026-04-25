@@ -1848,6 +1848,9 @@ async def get_trending_products(
     mode: Optional[str] = None,
 ):
     """Hunter endpoint — modo 100% mock (Render-safe, sin scraping)."""
+    import logging
+    logger = logging.getLogger("hunter")
+    logger.info("Hunter endpoint called: q=%s, limit=%d", q, limit)
     # Mock products base
     base_products = [
         {"name": "Auriculares Bluetooth ANC 2025", "cost_usd": 12.99, "demand": 85, "category": "tecnologia"},
