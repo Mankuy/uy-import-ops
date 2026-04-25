@@ -1933,7 +1933,8 @@ async def get_trending_products(
                 "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
                 "cost_usd": cost,
                 "ship_usd": round(cost * 0.15 + 2, 2),  # 15% of cost + base
-                "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,  # rough ML estimate
+ "ml_avg": round(cost * 2.5 * 42, 0) if cost > 0 else 0, # estimated ML price in UYU (2.5x markup)
+            "ml_estimated": True,
                 "img": img,
                 "desc": r.get("name", ""),
                 "source_url": r.get("product_url", ""),
