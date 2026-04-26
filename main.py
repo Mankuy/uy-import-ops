@@ -1777,7 +1777,7 @@ class AliExpressSearchInput(BaseModel):
 @app.post("/api/hunter/analyze-url")
 async def analyze_product_url(body: URLAnalyzeInput):
     """Analyze a product URL from AliExpress or 1688 and extract pricing data"""
-    hunter = ProductHunter()
+    hunter = AIProductHunter()
     result = await hunter.analyze_url(body.url)
     if not result:
         raise HTTPException(400, "Could not analyze URL. Make sure it's a valid AliExpress or 1688 product URL.")
@@ -1788,8 +1788,8 @@ async def analyze_product_url(body: URLAnalyzeInput):
 @app.post("/api/hunter/search-aliexpress")
 async def search_aliexpress(body: AliExpressSearchInput):
     """Search AliExpress for products using real browser automation"""
-    hunter = ProductHunter()
-    results = await hunter.search_aliexpress(body.query, body.limit)
+    hunter = AIProductHunter()
+    results = await hunter.search_products(body.query, body.limit)
     return {
         "query": body.query,
         "results": results,
@@ -1811,88 +1811,60 @@ async def get_trending_products(
     max_cost: Optional[float] = None,
     mode: Optional[str] = None,
 ):
-    """Hunter endpoint — 100% mock. Always returns base products."""
+    """Hunter endpoint — uses AliExpress scraper with real product URLs."""
     import logging
+    from scrapers import AIProductHunter
     logger = logging.getLogger("hunter")
     logger.info("Hunter: q=%s, limit=%d", q, limit)
     
-    # Base products (same for all queries)
-    base_products = [
-        {"name": "Auriculares Bluetooth ANC 2025", "cost_usd": 12.99, "demand": 85, "category": "tecnologia"},
-        {"name": "Smartwatch Resistente GPS", "cost_usd": 24.50, "demand": 78, "category": "tecnologia"},
-        {"name": "Lámpara Solar Jardín 4LED", "cost_usd": 8.75, "demand": 92, "category": "hogar"},
-        {"name": "Máscara de Dormir Seda Premium", "cost_usd": 5.20, "demand": 65, "category": "bienestar"},
-        {"name": "Organizador de Maleta 7Pzs", "cost_usd": 11.30, "demand": 71, "category": "hogar"},
-        {"name": "Cable USB-C Magnético 2m", "cost_usd": 4.99, "demand": 88, "category": "tecnologia"},
-        {"name": "Soporte Móvil Coche Magnético", "cost_usd": 6.80, "demand": 79, "category": "accesorios_auto"},
-        {"name": "Bolso Térmico Comida 2L", "cost_usd": 9.45, "demand": 82, "category": "hogar"},
-        {"name": "Espejo Maquillaje LED Recargable", "cost_usd": 15.00, "demand": 69, "category": "bienestar"},
-        {"name": "Almohada Cervical Viscoelástica", "cost_usd": 18.90, "demand": 95, "category": "hogar"},
-    ]
+    # Scrape AliExpress con Playwright
+    hunter = AIProductHunter()
+    raw_products = await hunter.search_products(q or category or "general", 50)
     
-    # Start with all products regardless of query
-    products = base_products.copy()
+    # Filtrar por demanda
+    filtered = [p for p in raw_products if p.get('demand', 0) >= min_demand]
     
-    # Category filter
-    if category:
-        products = [p for p in products if p.get("category") == category]
-    
-    # Demand filter
-    products = [p for p in products if p.get("demand", 0) >= min_demand]
-    
-    # Cost filter
+    # Filtrar por costo
     if min_cost is not None:
-        products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
+        filtered = [p for p in filtered if p.get('price_usd', 0) >= min_cost]
     if max_cost is not None:
-        products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
+        filtered = [p for p in filtered if p.get('price_usd', 0) <= max_cost]
     
-    # Sorting
-    sort_key_fn = {
-        "price": lambda x: x.get("cost_usd", 0),
-        "demand": lambda x: x.get("demand", 0),
-        "name": lambda x: x.get("name", "").lower(),
-    }.get(sort_by, lambda x: x.get("demand", 0))
-    products.sort(key=sort_key_fn, reverse=(sort_order != "asc"))
+    # Ordenar
+    reverse = sort_order == "desc"
+    sort_keys = {
+        "demand": lambda x: x.get('demand', 0),
+        "price_usd": lambda x: x.get('price_usd', 0),
+        "reviews": lambda x: x.get('reviews', 0),
+    }
+    if sort_by in sort_keys:
+        filtered.sort(key=sort_keys[sort_by], reverse=reverse)
     
-    # Pagination
-    total = len(products)
+    # Paginación
     start_idx = (page - 1) * limit
-    page_products = products[start_idx:start_idx + limit]
+    end_idx = start_idx + limit
+    page_products = filtered[start_idx:end_idx]
     
-    # Build response with source_url (uses query for AliExpress link)
-    search_term = q.strip() if q and q.strip() else "productos importacion"
-    normalized = []
-    for p in page_products:
-        normalized.append({
-            "name": p["name"],
-            "cat": p.get("category", "general"),
-            "demand": p.get("demand", 70),
-            "cost_usd": p.get("cost_usd", 0),
-            "ship_usd": round(p.get("cost_usd", 0) * 0.15 + 2, 2),
-            "ml_avg": round(p.get("cost_usd", 0) * 2.5 * 42, 0) if p.get("cost_usd", 0) > 0 else 0,
-            "ml_estimated": True,
-            "img": "",
-            "desc": p["name"],
-            "source_url": f"https://www.aliexpress.com/wholesale?SearchText={search_term.replace(' ', '+')}",
-            "rating": 4.2,
-            "reviews": 100,
-            "store": "AliExpress",
-            "source": "live" if q else "auto",
-        })
+    # Enriquecer con imágenes si se pide
+    if with_images:
+        from scrapers import find_product_image_bing
+        for p in page_products:
+            if not p.get('img') and p.get('name'):
+                p['img'] = await find_product_image_bing(p['name'])
     
     return {
-        "products": normalized,
-        "count": len(normalized),
-        "total_available": total,
+        "query": q or category or "general",
+        "products": page_products,
+        "count": len(filtered),
         "page": page,
-        "total_pages": max(1, (total + limit - 1) // limit),
-        "with_images": with_images,
-        "query": q,
-        "sources": ["mock"],
-        "source": "live" if q else "auto",
+        "total_pages": max(1, (len(filtered) + limit - 1) // limit) if limit > 0 else 0,
+        "filters_applied": {
+            "min_demand": min_demand if min_demand != 50 else None,
+            "min_cost": min_cost,
+            "max_cost": max_cost,
+        },
+        "source": "aliexpress-live",
     }
-
-
 @app.get("/api/hunter/categories")
 def get_hunter_categories():
     """Get all product categories with counts"""
