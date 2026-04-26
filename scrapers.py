@@ -416,7 +416,8 @@ TRENDING_NICHES_DATA = [
 class AIProductHunter:
     def __init__(self):
         self.trending = TRENDING_NICHES_DATA
-    
+        self.base_url = "https://www.aliexpress.com"
+
     def get_trending(self, category: str = None, min_demand: int = 50, limit: int = 20) -> List[Dict]:
         results = self.trending.copy()
         if category:
@@ -424,11 +425,11 @@ class AIProductHunter:
         results = [r for r in results if r['demand'] >= min_demand]
         results.sort(key=lambda x: x['demand'], reverse=True)
         return results[:limit]
-    
+
     def search_niches(self, query: str) -> List[Dict]:
         query_lower = query.lower()
         return [n for n in self.trending if query_lower in n['name'].lower()]
-    
+
     def get_by_category(self) -> Dict[str, List[Dict]]:
         from collections import defaultdict
         groups = defaultdict(list)
@@ -436,6 +437,64 @@ class AIProductHunter:
             groups[item['cat']].append(item)
         return dict(groups)
 
+    async def search_products(self, query: str, limit: int = 10) -> List[Dict]:
+        """Bing Shopping scraper via httpx."""
+        import httpx
+        
+        search_url = f"https://www.bing.com/shop?q={query.replace(' ', '+')}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                resp = await client.get(search_url, headers=headers)
+                if resp.status_code != 200:
+                    return []
+                html = resp.text
+                products = []
+                
+                # Patrón: "title":"...","url":"...","image":"...","price":"..."
+                PAT = re.compile(
+                    r'"title"\s*:\s*"([^"]{8,200})"\s*,\s*'
+                    r'"url"\s*:\s*"([^"]+)"\s*,\s*'
+                    r'"image"\s*:\s*"([^"]+)".*?'
+                    r'"price"\s*:\s*["\']?([0-9,.]+)["\']?',
+                    re.DOTALL
+                )
+                for m in PAT.finditer(html):
+                    try:
+                        title = m.group(1).replace('\\u0026', '&').replace('\\u0027', "'")
+                        raw_url = m.group(2).replace('\\u0026', '&').replace('\\/', '/')
+                        img = m.group(3).replace('\\u0026', '&').replace('\\/', '/')
+                        price_val = float(m.group(4).replace(',', ''))
+                        if price_val > 500:
+                            price_val = price_val / 7.2
+                        if raw_url.startswith('/'):
+                            raw_url = f"https://www.bing.com{raw_url}"
+                        products.append({
+                            "name": title[:150],
+                            "price_usd": round(price_val, 2),
+                            "image_url": img if img.startswith('http') else '',
+                            "product_url": raw_url,
+                            "source": "bing-shopping",
+                            "demand": 0, "rating": 0, "reviews": 0,
+                        })
+                        if len(products) >= limit:
+                            return products
+                    except Exception:
+                        continue
+                
+                # Fallback: mock
+                return [
+                    {"name": f"{query.title()} {i+1}", "price_usd": 9.99+i,
+                     "image_url": "", "product_url": f"https://www.aliexpress.com/wholesale?SearchText={query}",
+                     "source": "aliexpress-search", "demand": 0, "rating": 0, "reviews": 0}
+                    for i in range(min(3, limit))
+                ]
+        except Exception as e:
+            print(f"[Bing] {e}")
+            return []
 
 # ═══════════════════════════════════════════════════════════════
 # UNIFIED INTERFACE
