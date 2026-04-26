@@ -416,6 +416,12 @@ TRENDING_NICHES_DATA = [
 class AIProductHunter:
     def __init__(self):
         self.trending = TRENDING_NICHES_DATA
+        self.base_url = "https://www.aliexpress.com"
+        self.cny_to_usd = 0.14
+
+class AIProductHunter:
+    def __init__(self):
+        self.trending = TRENDING_NICHES_DATA
     
     def get_trending(self, category: str = None, min_demand: int = 50, limit: int = 20) -> List[Dict]:
         results = self.trending.copy()
@@ -435,6 +441,118 @@ class AIProductHunter:
         for item in self.trending:
             groups[item['cat']].append(item)
         return dict(groups)
+    async def search_products(self, query: str, limit: int = 10) -> List[Dict]:
+        """Search AliExpress using httpx + _dida_config_ JSON extraction (no Playwright)."""
+        import httpx
+        from urllib.parse import quote
+        
+        search_url = f"{self.base_url}/wholesale?SearchText={quote(query)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+                resp = await client.get(search_url, headers=headers)
+                if resp.status_code != 200:
+                    return []
+                
+                html = resp.text
+                products = []
+                
+                # Pattern 1: _dida_config_._init_data_
+                init_pat = re.compile(
+                    r'window\._dida_config_\._init_data_\s*=\s*({.*?})\s*/\*!-->init-data-end--\*/',
+                    re.DOTALL
+                )
+                match = init_pat.search(html)
+                if match:
+                    try:
+                        payload = json.loads(match.group(1))
+                        items = (
+                            payload.get("data", {})
+                            .get("data", {})
+                            .get("root", {})
+                            .get("fields", {})
+                            .get("mods", {})
+                            .get("itemList", {})
+                            .get("content", [])
+                        )
+                        for item in items[:limit]:
+                            try:
+                                title = item.get("title", "").strip()
+                                price_val = item.get("price", {}).get("value", 0) or item.get("salePrice", 0)
+                                if isinstance(price_val, str):
+                                    price_val = float(price_val.replace(",", "").replace("US $", ""))
+                                elif not isinstance(price_val, (int, float)):
+                                    price_val = 0
+                                
+                                item_url = item.get("itemUrl", "")
+                                if not item_url.startswith("http"):
+                                    item_url = f"https:{item_url}" if item_url.startswith("//") else f"https://www.aliexpress.com{item_url}"
+                                
+                                image_url = item.get("image", {}).get("imageUrl", "")
+                                if not image_url.startswith("http"):
+                                    image_url = f"https:{image_url}" if image_url.startswith("//") else ""
+                                
+                                sales = item.get("itemSalesSize", 0)
+                                rating = item.get("rating", 0)
+                                reviews = item.get("feedbackScore", 0)
+                                
+                                if title and price_val > 0:
+                                    products.append({
+                                        "name": title[:150],
+                                        "price_usd": round(float(price_val), 2),
+                                        "image_url": image_url,
+                                        "product_url": item_url,
+                                        "source": "aliexpress",
+                                        "demand": int(sales) if sales else 0,
+                                        "rating": float(rating) if rating else 0,
+                                        "reviews": int(reviews) if reviews else 0,
+                                        "sold_count": int(sales) if sales else 0,
+                                    })
+                            except:
+                                continue
+                        return products
+                    except:
+                        pass
+                
+                # Fallback: pattern amplio
+                fb_pat = re.compile(
+                    r'"title"\s*:\s*"([^"]{5,200})"\s*,\s*"price"\s*:\s*{(?:"value"|"value":)\s*([0-9.]+).*?"itemUrl"\s*:\s*"([^"]+)"\s*,\s*"imageUrl"\s*:\s*"([^"]+)"',
+                    re.DOTALL
+                )
+                for m in fb_pat.finditer(html):
+                    try:
+                        title = m.group(1).strip()
+                        price_val = float(m.group(2))
+                        item_url = m.group(3)
+                        image_url = m.group(4)
+                        if not item_url.startswith("http"):
+                            item_url = f"https:{item_url}" if item_url.startswith("//") else f"https://www.aliexpress.com{item_url}"
+                        if not image_url.startswith("http"):
+                            image_url = f"https:{image_url}" if image_url.startswith("//") else ""
+                        products.append({
+                            "name": title[:150],
+                            "price_usd": round(price_val, 2),
+                            "image_url": image_url,
+                            "product_url": item_url,
+                            "source": "aliexpress-fallback",
+                            "demand": 0, "rating": 0, "reviews": 0, "sold_count": 0,
+                        })
+                        if len(products) >= limit:
+                            break
+                    except:
+                        continue
+                return products
+        except:
+            return []
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -446,77 +564,4 @@ class AIProductHunter:
 # ═══════════════════════════════════════════════════════════════
 # BING SHOPPING SCRAPER — HTTP-only, no Playwright needed
 # ═══════════════════════════════════════════════════════════════
-
-async def search_bing_shopping(query: str, limit: int = 20) -> List[Dict]:
-    """Search Bing Shopping. Render-safe."""
-    search_url = f"https://www.bing.com/shop?q={query.replace(' ', '+')}&form=SHOPSB"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-    }
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client:
-            resp = await client.get(search_url, headers=headers)
-            if resp.status_code != 200:
-                return []
-            
-            html = resp.text
-            products = []
-            
-            # Pattern 1
-            item_pattern = re.compile(r'"title":"([^"]{5,200})","url":"([^"]+)","image":"([^"]+)".*?"price":"?([0-9.,]+)"?')
-            for m in item_pattern.finditer(html):
-                title = m.group(1).replace('\u0026', '&').replace('\u0027', "'")
-                url = m.group(2).replace('\u0026', '&').replace('\/', '/')
-                img = m.group(3).replace('\u0026', '&').replace('\/', '/')
-                price_str = m.group(4).replace(',', '')
-                try:
-                    price = float(price_str)
-                    if price > 500:
-                        price = price / 42
-                except:
-                    price = 0
-                
-                if title and len(title) > 5:
-                    resolved_url = url if url.startswith('http') else f"https://www.bing.com{url}"
-                    products.append({
-                        "name": title[:150],
-                        "price_usd": round(price, 2) if price > 0 else 0,
-                        "image_url": img if img.startswith('http') else '',
-                        "product_url": resolved_url,
-                        "source": "bing-shopping",
-                        "rating": 0,
-                        "sold_count": 0,
-                    })
-            
-            # Pattern 2 — fallback: regex simple (sin comillas triple)
-            if len(products) < 3:
-                titles = re.findall(r'class="[^"]*(?:title|prod)[^"]*"[^>]*>([^<]{10,200})</', html)
-                # Usar regex alternativo que no rompe con comillas
-                prices = re.findall(r"""['"]?(?:price|cost)['"]?\s*[:=]\s*['"]?([0-9]+[.,]?[0-9]*)['"]?""", html, re.I)
-                imgs = re.findall(r'"?https?://[^"\s]+\.(?:jpg|jpeg|png|webp)"?', html)
-                
-                for i, title in enumerate(titles[:limit]):
-                    title_clean = re.sub(r'<[^>]+>', '', title).strip()
-                    p = float(prices[i].replace(',', '')) if i < len(prices) else 0
-                    if p > 500:
-                        p = p / 42
-                    img = imgs[i] if i < len(imgs) else ""
-                    products.append({
-                        "name": title_clean[:150],
-                        "price_usd": round(p, 2) if p > 0 else 0,
-                        "image_url": img,
-                        "product_url": f"https://www.bing.com/shop?q={query.replace(' ', '+')}",
-                        "source": "bing-shopping-fallback",
-                        "rating": 0,
-                        "sold_count": 0,
-                    })
-            
-            return products[:limit]
-    except Exception as e:
-        print(f"[Bing Shopping] Error: {e}")
-        return []
 
