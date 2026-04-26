@@ -6,3 +6,6 @@ pydantic==2.9.2
 python-multipart==0.0.17
 pillow==10.4.0
 python-dotenv==1.0.1
+
+playwright==1.47.0
+playwright-browser==1.47.0
