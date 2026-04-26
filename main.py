@@ -1797,7 +1797,7 @@ async def search_aliexpress(body: AliExpressSearchInput):
         "source": "aliexpress",
     }
 
-@app.get("/api/hunter/rending")
+@app.get("/api/hunter/trending")
 async def get_trending_products(
     category: Optional[str] = None,
     min_demand: int = 50,
