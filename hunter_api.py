@@ -76,24 +76,19 @@ def insert_db(product):
         return False
 
 def hunt_banggood_sync(keywords, min_price=None, max_price=None, max_products=20):
-    """Scrapea Banggood con Playwright o subprocess a hunter_cdp.py."""
-    HUNTER_SCRIPT = os.path.join(BASE, "hunter_cdp.py")
-    PYTHON = os.path.expanduser("~/.hermes/hermes-agent/venv/bin/python") if os.path.exists(os.path.expanduser("~/.hermes/hermes-agent/venv/bin/python")) else "python3"
-    
-    cmd = [PYTHON, HUNTER_SCRIPT, "banggood", keywords]
-    if min_price is not None:
-        cmd.append(str(min_price))
-    if max_price is not None:
-        cmd.append(str(max_price))
-    
+    """Scrapea Banggood con Playwright (headless Chromium)."""
+    PYTHON = sys.executable
+    scraper = os.path.join(BASE, "scrape_banggood.py")
+    cmd = [PYTHON, scraper, keywords]
+    if min_price is not None: cmd.append(str(min_price))
+    if max_price is not None: cmd.append(str(max_price))
+    cmd.append(str(max_products))
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=90, cwd=BASE)
-        json_path = os.path.join(BASE, "hunter_products.json")
-        if os.path.exists(json_path):
-            with open(json_path) as f:
-                return json.load(f)[:max_products]
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout)
     except Exception as e:
-        print(f"  Banggood error: {e}")
+        print(f"  BG error: {e}")
     return []
 
 def hunt_aliexpress_cdp(keywords=None, min_price=None, max_price=None):
