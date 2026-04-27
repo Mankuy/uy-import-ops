@@ -23,6 +23,53 @@ class HunterRequest(BaseModel):
     max_price: Optional[float] = None
     max_products: int = 20
 
+
+def init_db():
+    """Crea la DB y tabla products si no existen."""
+    os.makedirs(os.path.dirname(DB), exist_ok=True)
+    conn = sqlite3.connect(DB)
+    conn.execute("""CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name VARCHAR,
+        description TEXT,
+        category VARCHAR,
+        source_url VARCHAR,
+        image_url VARCHAR,
+        product_cost_usd FLOAT,
+        shipping_cost_usd FLOAT DEFAULT 0,
+        hs_code VARCHAR DEFAULT '',
+        tariff_rate FLOAT DEFAULT 0,
+        iva_rate FLOAT DEFAULT 22,
+        stat_fee_rate FLOAT DEFAULT 0,
+        agent_fee_usd FLOAT DEFAULT 0,
+        total_landed_cost_uyu FLOAT DEFAULT 0,
+        price_cost_plus_uyu FLOAT DEFAULT 0,
+        price_value_uyu FLOAT DEFAULT 0,
+        price_aggressive_uyu FLOAT DEFAULT 0,
+        price_luxury_uyu FLOAT DEFAULT 0,
+        price_extreme_uyu FLOAT DEFAULT 0,
+        price_premium_vs_comp_uyu FLOAT DEFAULT 0,
+        margin_cost_plus FLOAT DEFAULT 0,
+        margin_value FLOAT DEFAULT 0,
+        margin_aggressive FLOAT DEFAULT 0,
+        margin_luxury FLOAT DEFAULT 0,
+        margin_extreme FLOAT DEFAULT 0,
+        margin_premium_vs_comp FLOAT DEFAULT 0,
+        status VARCHAR DEFAULT 'new',
+        ml_competitor_price FLOAT,
+        ml_competitor_url VARCHAR,
+        demand_score INTEGER DEFAULT 50,
+        opportunity_score INTEGER,
+        best_strategy VARCHAR,
+        best_margin FLOAT,
+        notes TEXT,
+        created_at DATETIME,
+        updated_at DATETIME
+    )""")
+    conn.commit()
+    conn.close()
+
+init_db()
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "hunter-api"}
