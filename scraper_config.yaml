@@ -1,0 +1,7 @@
+concurrency: 1
+cookies: []
+delay_max: 3
+delay_min: 2
+max_price: 100.0
+min_price: 1.0
+retry_attempts: 2
