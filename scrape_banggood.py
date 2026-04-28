@@ -1,64 +1,57 @@
 #!/usr/bin/env python3
-"""Mini scraper Banggood con Playwright."""
-import sys, json, re, os
+"""Banggood scraper HTTP-only. Sin Playwright."""
+import sys, json, re, asyncio
 from urllib.parse import quote_plus
+import httpx
 
-async def scrape():
-    from playwright.async_api import async_playwright
-    keywords = sys.argv[1] if len(sys.argv) > 1 else "phone case"
-    min_price = float(sys.argv[2]) if len(sys.argv) > 2 else None
-    max_price = float(sys.argv[3]) if len(sys.argv) > 3 else None
-    max_products = int(sys.argv[4]) if len(sys.argv) > 4 else 20
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"}
+
+PRICE_PATTERNS = [
+    r'Solo US\$([\d,.]+)',
+    r'<span[^>]*price[^>]*>[^<]*US\$([\d,.]+)',
+    r'US\$([\d]+\.[\d]{2})',
+]
+
+async def get_price(client, url):
+    try:
+        r = await client.get(url, timeout=10.0)
+        for pat in PRICE_PATTERNS:
+            m = re.search(pat, r.text)
+            if m:
+                try: return float(m.group(1).replace(",", ""))
+                except: pass
+    except: pass
+    return 0.0
+
+async def search(keywords: str, min_price=None, max_price=None, max_products=20):
+    query = quote_plus(keywords)
+    url = f"https://www.banggood.com/search/{query}.html"
     
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        query = quote_plus(keywords)
-        await page.goto(f"https://www.banggood.com/search/{query}.html", wait_until="domcontentloaded", timeout=30000)
-        await page.wait_for_timeout(5000)
+    async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True) as client:
+        r = await client.get(url, timeout=15.0)
+        products = re.findall(r'href="(https://www\.banggood\.com/[^"]*-p-\d+[^"]*)"[^>]*title="([^"]+)"', r.text)
         
         results = []
-        products = await page.evaluate("""() => {
-            const prices = document.querySelectorAll('span.price');
-            const out = [];
-            for (const priceEl of prices) {
-                const txt = priceEl.textContent.trim();
-                const m = txt.match(/[\\d,.]+/);
-                if (!m) continue;
-                let container = priceEl;
-                let link = null, titleEl = null, imgEl = null;
-                for (let i = 0; i < 15; i++) {
-                    container = container.parentElement;
-                    if (!container) break;
-                    if (!link) { const a = container.querySelector('a[href]'); if (a && a.href.includes('banggood.com') && !a.href.includes('/search')) link = a; }
-                    if (!titleEl) { const t = container.querySelector('a[title]'); if (t) titleEl = t; }
-                    if (!imgEl) { const img = container.querySelector('img[src*="imgaz"]'); if (img) imgEl = img; }
-                }
-                if (link) {
-                    out.push({url: link.href.split('?')[0], title: titleEl ? titleEl.getAttribute('title') : link.textContent.trim().substring(0,150), price: parseFloat(m[0].replace(/,/g,'')), image: imgEl ? imgEl.src : ''});
-                }
-            }
-            return out;
-        }""")
-        
-        for p_data in products:
-            if min_price is not None and p_data["price"] < min_price: continue
-            if max_price is not None and p_data["price"] > max_price: continue
-            pid = re.search(r"/p-(\\d+)", p_data["url"])
-            results.append({
-                "product_id": pid.group(1) if pid else "?",
-                "url": p_data["url"],
-                "title": p_data["title"][:150],
-                "price_usd": p_data["price"],
-                "image_url": p_data["image"],
-                "source": "banggood-pw",
-                "platform": "banggood",
-            })
+        tasks = []
+        for prod_url, title in products:
             if len(results) >= max_products: break
-        
-        await browser.close()
-        print(json.dumps(results))
+            p_id = re.search(r"-p-(\d+)", prod_url)
+            pid = p_id.group(1) if p_id else "?"
+            price = await get_price(client, prod_url.split("?")[0])
+            if min_price is not None and price < min_price: continue
+            if max_price is not None and price > max_price: continue
+            img = re.search(r'src="(https://imgaz[^"]+)"', r.text[:r.text.find(prod_url)+5000] + r.text)
+            results.append({
+                "product_id": pid, "url": prod_url.split("?")[0], "title": title[:150],
+                "price_usd": price, "image_url": img.group(1) if img else "",
+                "source": "banggood-http", "platform": "banggood"
+            })
+        return results
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(scrape())
+    kw = sys.argv[1] if len(sys.argv) > 1 else "phone case"
+    mn = float(sys.argv[2]) if len(sys.argv) > 2 else None
+    mx = float(sys.argv[3]) if len(sys.argv) > 3 else None
+    mp = int(sys.argv[4]) if len(sys.argv) > 4 else 20
+    res = asyncio.run(search(kw, mn, mx, mp))
+    print(json.dumps(res))

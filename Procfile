@@ -1,1 +1,1 @@
-web: PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/playwright python -m playwright install chromium --with-deps 2>/dev/null; PYTHONUNBUFFERED=1 uvicorn hunter_api:app --host 0.0.0.0 --port ${PORT:-8000}
+web: uvicorn hunter_api:app --host 0.0.0.0 --port ${PORT:-8000}

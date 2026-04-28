@@ -76,20 +76,42 @@ def insert_db(product):
         return False
 
 def hunt_banggood_sync(keywords, min_price=None, max_price=None, max_products=20):
-    """Scrapea Banggood con Playwright (headless Chromium)."""
-    PYTHON = sys.executable
-    scraper = os.path.join(BASE, "scrape_banggood.py")
-    cmd = [PYTHON, scraper, keywords]
-    if min_price is not None: cmd.append(str(min_price))
-    if max_price is not None: cmd.append(str(max_price))
-    cmd.append(str(max_products))
+    """Scrapea Banggood con HTTP puro + regex (sin Playwright)."""
+    import asyncio, httpx, re
+    from urllib.parse import quote_plus
+    HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    
+    async def search():
+        query = quote_plus(keywords)
+        r = await httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=20.0).get(f"https://www.banggood.com/search/{query}.html")
+        html = r.text
+        products = re.findall(r'href="(https://www\.banggood\.com/[^"]*-p-\d+[^"]*)"[^>]*title="([^"]+)"', html)
+        results = []
+        for prod_url, title in products:
+            if len(results) >= max_products: break
+            pid_m = re.search(r"-p-(\d+)", prod_url)
+            pid = pid_m.group(1) if pid_m else "?"
+            # Fetch product page for price
+            try:
+                pr = await httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=10.0).get(prod_url.split("?")[0])
+                price = 0.0
+                for pat in [r'Solo US\$([\d,.]+)', r'<span[^>]*price[^>]*>[^<]*US\$([\d,.]+)', r'US\$([\d]+\.[\d]{2})']:
+                    m = re.search(pat, pr.text)
+                    if m:
+                        try: price = float(m.group(1).replace(",", "")); break
+                        except: pass
+            except:
+                price = 0.0
+            if min_price is not None and price < min_price: continue
+            if max_price is not None and price > max_price: continue
+            results.append({"product_id": pid, "url": prod_url.split("?")[0], "title": title[:150], "price_usd": price, "image_url": "", "source": "banggood", "platform": "banggood"})
+        return results
+    
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=90, cwd=BASE)
-        if result.returncode == 0 and result.stdout.strip():
-            return json.loads(result.stdout)
+        return asyncio.run(search())
     except Exception as e:
         print(f"  BG error: {e}")
-    return []
+        return []
 
 def hunt_aliexpress_cdp(keywords=None, min_price=None, max_price=None):
     HUNTER_SCRIPT = os.path.join(BASE, "hunter_cdp.py")
