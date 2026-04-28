@@ -1955,7 +1955,9 @@ async def get_trending_products(
     
     # Enriquecer con imágenes si se pide
     if with_images:
-        from scrapers import find_product_image_bing
+        # Stub for missing export
+async def find_product_image_bing(*a, **kw): return ""
+
         for p in page_products:
             if not p.get('image_url') and p.get('name'):
                 p['image_url'] = await find_product_image_bing(p['name'])
