@@ -1,182 +1,84 @@
 #!/usr/bin/env python3
-"""Hunter API v2 - Banggood (Playwright with HTTP fallback) + AliExpress CDP."""
-import os, subprocess, json, sqlite3, re
+"""Hunter API - Microservicio para buscar productos. Sirve frontend + API + hunter."""
+import os, json, re, subprocess
 from datetime import datetime
 from urllib.parse import quote_plus
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import Optional
 
-app = FastAPI(title="Hunter API", version="2.0")
+app = FastAPI(title="Hunter Dashboard", version="5.1")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(BASE, "backend", "research.db")
-JSON_OUT = os.path.join(BASE, "hunter_products.json")
+DB_DIR = os.path.join(BASE, "backend")
+DB = os.path.join(DB_DIR, "research.db")
+os.makedirs(DB_DIR, exist_ok=True)
 
-class HunterRequest(BaseModel):
-    platform: str = "banggood"
-    keywords: str = ""
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
-    max_products: int = 20
+# ─── DB Init ───
+import sqlite3
+conn = sqlite3.connect(DB)
+conn.execute("""CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR, source_url VARCHAR, image_url VARCHAR,
+    product_cost_usd FLOAT, status VARCHAR DEFAULT 'new',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)""")
+conn.commit()
+conn.close()
 
-def init_db():
-    os.makedirs(os.path.dirname(DB), exist_ok=True)
-    conn = sqlite3.connect(DB)
-    conn.execute("""CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name VARCHAR, description TEXT, category VARCHAR,
-        source_url VARCHAR, image_url VARCHAR,
-        product_cost_usd FLOAT, shipping_cost_usd FLOAT DEFAULT 0,
-        hs_code VARCHAR DEFAULT '', tariff_rate FLOAT DEFAULT 0,
-        iva_rate FLOAT DEFAULT 22, stat_fee_rate FLOAT DEFAULT 0,
-        agent_fee_usd FLOAT DEFAULT 0,
-        total_landed_cost_uyu FLOAT DEFAULT 0,
-        price_cost_plus_uyu FLOAT DEFAULT 0, price_value_uyu FLOAT DEFAULT 0,
-        price_aggressive_uyu FLOAT DEFAULT 0, price_luxury_uyu FLOAT DEFAULT 0,
-        price_extreme_uyu FLOAT DEFAULT 0, price_premium_vs_comp_uyu FLOAT DEFAULT 0,
-        margin_cost_plus FLOAT DEFAULT 0, margin_value FLOAT DEFAULT 0,
-        margin_aggressive FLOAT DEFAULT 0, margin_luxury FLOAT DEFAULT 0,
-        margin_extreme FLOAT DEFAULT 0, margin_premium_vs_comp FLOAT DEFAULT 0,
-        status VARCHAR DEFAULT 'new',
-        ml_competitor_price FLOAT, ml_competitor_url VARCHAR,
-        demand_score INTEGER DEFAULT 50, opportunity_score INTEGER,
-        best_strategy VARCHAR, best_margin FLOAT, notes TEXT,
-        created_at DATETIME, updated_at DATETIME
-    )""")
-    conn.commit()
-    conn.close()
-
-init_db()
-
-def insert_db(product):
-    try:
-        conn = sqlite3.connect(DB)
-        now = datetime.utcnow().isoformat()
-        title = product["title"][:150]
-        url = product["url"]
-        img = product.get("image_url", "")
-        price = product["price_usd"]
-        platform = product.get("platform", "banggood")
-        existing = conn.execute("SELECT id FROM products WHERE source_url=?", (url,)).fetchone()
-        if existing:
-            conn.execute("UPDATE products SET name=?, image_url=?, product_cost_usd=?, updated_at=? WHERE id=?",
-                (title, img, price, now, existing[0]))
-        else:
-            conn.execute("INSERT INTO products (name,source_url,image_url,product_cost_usd,status,demand_score,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
-                (title, url, img, price, f"hunter_{platform}", 50, now, now))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"  DB ERROR: {e}")
-        return False
-
-def hunt_banggood_sync(keywords, min_price=None, max_price=None, max_products=20):
-    """Scrapea Banggood con HTTP puro + regex (sin Playwright)."""
-    import asyncio, httpx, re
-    from urllib.parse import quote_plus
-    HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    
-    async def search():
-        query = quote_plus(keywords)
-        r = await httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=20.0).get(f"https://www.banggood.com/search/{query}.html")
-        html = r.text
-        products = re.findall(r'href="(https://www\.banggood\.com/[^"]*-p-\d+[^"]*)"[^>]*title="([^"]+)"', html)
-        results = []
-        for prod_url, title in products:
-            if len(results) >= max_products: break
-            pid_m = re.search(r"-p-(\d+)", prod_url)
-            pid = pid_m.group(1) if pid_m else "?"
-            # Fetch product page for price
-            try:
-                pr = await httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=10.0).get(prod_url.split("?")[0])
-                price = 0.0
-                for pat in [r'Solo US\$([\d,.]+)', r'<span[^>]*price[^>]*>[^<]*US\$([\d,.]+)', r'US\$([\d]+\.[\d]{2})']:
-                    m = re.search(pat, pr.text)
-                    if m:
-                        try: price = float(m.group(1).replace(",", "")); break
-                        except: pass
-            except:
-                price = 0.0
-            if min_price is not None and price < min_price: continue
-            if max_price is not None and price > max_price: continue
-            results.append({"product_id": pid, "url": prod_url.split("?")[0], "title": title[:150], "price_usd": price, "image_url": "", "source": "banggood", "platform": "banggood"})
-        return results
-    
-    try:
-        return asyncio.run(search())
-    except Exception as e:
-        print(f"  BG error: {e}")
-        return []
-
-def hunt_aliexpress_cdp(keywords=None, min_price=None, max_price=None):
-    HUNTER_SCRIPT = os.path.join(BASE, "hunter_cdp.py")
-    PYTHON = os.path.expanduser("~/.hermes/hermes-agent/venv/bin/python") if os.path.exists(os.path.expanduser("~/.hermes/hermes-agent/venv/bin/python")) else "python3"
-    if not os.path.exists(HUNTER_SCRIPT):
-        return []
-    cmd = [PYTHON, HUNTER_SCRIPT, "aliexpress"]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=90, cwd=BASE)
-        json_path = os.path.join(BASE, "hunter_products.json")
-        if os.path.exists(json_path):
-            with open(json_path) as f:
-                return json.load(f)
-    except:
-        pass
-    return []
-
+# ─── API ───
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "hunter-api"}
+    return {"status": "ok", "service": "hunter-dashboard"}
 
 @app.post("/api/hunter/search")
-def hunter_search(req: HunterRequest):
-    all_results = []
-    if req.platform in ("banggood", "bg", "all"):
-        products = hunt_banggood_sync(req.keywords, req.min_price, req.max_price, req.max_products)
-        for p in products:
-            insert_db(p)
-            all_results.append(p)
-    if req.platform in ("aliexpress", "ae", "all"):
-        products = hunt_aliexpress_cdp(req.keywords, req.min_price, req.max_price)
-        for p in products:
-            insert_db(p)
-            all_results.append(p)
-    if all_results:
-        with open(JSON_OUT, "w", encoding="utf-8") as f:
-            json.dump(all_results, f, indent=2, ensure_ascii=False)
-    return {"added": len(all_results), "platform": req.platform, "keywords": req.keywords, "products": all_results, "success": True}
+async def hunter_search(request: Request):
+    body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+    kw = body.get("keywords", "phone case")
+    mn = body.get("min_price")
+    mx = body.get("max_price")
+    mp = body.get("max_products", 20)
+    
+    import httpx
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    
+    async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=20.0) as c:
+        query = quote_plus(kw)
+        r = await c.get(f"https://www.banggood.com/search/{query}.html")
+        html = r.text
+        links = re.findall(r'href="(https://www\\.banggood\\.com/[^"]*-p-\\d+[^"]*)"[^>]*title="([^"]+)"', html)
+        results = []
+        for url, title in links:
+            if len(results) >= mp: break
+            pid = re.search(r"-p-(\\d+)", url)
+            price = 0.0
+            try:
+                pr = await c.get(url.split("?")[0], timeout=10.0)
+                for pat in [r'Solo US\\$([\\d,.]+)', r'US\\$([\\d]+\\.[\\d]{2})']:
+                    m = re.search(pat, pr.text)
+                    if m:
+                        try: price = float(m.group(1).replace(",","")); break
+                        except: pass
+            except: pass
+            if mn is not None and price < mn: continue
+            if mx is not None and price > mx: continue
+            
+            # Save to DB
+            try:
+                conn_db = sqlite3.connect(DB)
+                conn_db.execute("INSERT OR REPLACE INTO products (name, source_url, product_cost_usd, status, updated_at) VALUES (?,?,?,'hunter_new',?)",
+                    (title[:150], url.split("?")[0], price, datetime.utcnow().isoformat()))
+                conn_db.commit()
+                conn_db.close()
+            except: pass
+            
+            results.append({"product_id": pid.group(1) if pid else "?", "url": url.split("?")[0],
+                "title": title[:150], "price_usd": price, "image_url": "", "source": "banggood", "platform": "banggood"})
+        return {"added": len(results), "keywords": kw, "products": results, "success": True}
 
-@app.get("/api/hunter/products")
-def get_hunter_products(status: str = None, limit: int = 50):
-    conn = sqlite3.connect(DB)
-    query = "SELECT id, name, source_url, image_url, product_cost_usd, status, created_at FROM products"
-    params = []
-    if status:
-        query += " WHERE status LIKE ?"
-        params.append("hunter_%")
-    query += " ORDER BY created_at DESC LIMIT ?"
-    params.append(limit)
-    rows = conn.execute(query, params).fetchall()
-    conn.close()
-    return [{"id": r[0], "name": r[1], "url": r[2], "image": r[3], "price_usd": r[4], "status": r[5], "created": r[6]} for r in rows]
-
-@app.delete("/api/hunter/products/{pid}")
-def delete_product(pid: int):
-    conn = sqlite3.connect(DB)
-    conn.execute("DELETE FROM products WHERE id=?", (pid,))
-    conn.commit()
-    conn.close()
-    return {"deleted": True}
-
-@app.get("/api/hunter/status")
-def hunter_status():
-    return {"banggood_auto": True, "aliexpress_cdp": False, "note": "CDP only works locally"}
-
-STATIC_DIR = os.path.join(BASE, "static")
-if os.path.exists(STATIC_DIR):
-    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+# ─── Static frontend ───
+STATIC = os.path.join(BASE, "static")
+if os.path.exists(STATIC):
+    app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
