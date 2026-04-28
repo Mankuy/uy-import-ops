@@ -23,13 +23,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.orm import declarative_base, sessionmaker
 import httpx
 
-# SCRAPER IMPORTS — loaded at startup (lightweight, no Playwright)
-# Stubs for missing scrapers exports
-class AIProductHunter:
-    def __init__(self, *a, **kw): pass
-    def hunt(self, *a, **kw): return []
-
-TRENDING_NICHES_DATA = []
+from scrapers import ProductHunter, TRENDING_NICHES_DATA, search_bing_shopping, search_bing_web_products, generate_mock_sourcing_data
 
 # ═══════════════════════════════════════════════════════════════
 # IMAGE CACHE — persists across requests and restarts
@@ -299,7 +293,7 @@ async def enrich_products_with_images(products: List[dict], max_concurrent: int 
 # ═══════════════════════════════════════════════════════════════
 # CONFIG
 # ═══════════════════════════════════════════════════════════════
-DB_PATH = os.path.join(os.path.dirname(__file__), "backend", "research.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "research.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -416,37 +410,43 @@ NICHE_DESCRIPTIONS = {
     "Balanza digital cocina 10kg precisión": "Balanza de cocina digital 10kg/1g. Pantalla LCD, función tara, apagado auto.",
 }
 
-# WINNING_NICHES — poblado desde DB al iniciar
-def _load_winning_niches():
-    """Load winning niches from DB if available, else fallback to static data."""
-    try:
-        from sqlalchemy import select
-        # Product model is defined later in this module; resolved at runtime
-        db = SessionLocal()
-        stmt = select(Product).where(Product.demand_score >= 40).order_by(Product.demand_score.desc()).limit(100)
-        results = db.execute(stmt).scalars().all()
-        db.close()
-        if results:
-            return [
-                {
-                    "name": p.name,
-                    "cat": p.category or "otros",
-                    "cost_usd": p.product_cost_usd or 0,
-                    "ship_usd": p.shipping_cost_usd or 0,
-                    "ml": p.ml_competitor_price or 0,
-                    "demand": p.demand_score or 50,
-                    "desc": p.description or "",
-                    "img": p.image_url or "",
-                    "product_url": p.source_url or "",
-                }
-                for p in results
-            ]
-    except Exception as e:
-        print(f"Warning loading niches from DB: {e}")
-    return [{"name": n["name"], "cat": n["cat"], "cost_usd": n["cost"], "ship_usd": n["ship"],
-             "ml": n["ml"], "demand": n["demand"], "desc": n.get("desc", ""), "img": n.get("img", "")}
-            for n in TRENDING_NICHES_DATA]
-
+WINNING_NICHES = []
+for n in TRENDING_NICHES_DATA:
+    cat = n["cat"]
+    name = n["name"]
+    cost = n["cost"]
+    ship = n["ship"]
+    ml = n["ml"]
+    demand = n["demand"]
+    
+    # Calculate profit metrics
+    est_margin = ((ml * 0.5) - (cost + ship) * 42) / ((cost + ship) * 42) * 100 if (cost + ship) > 0 else 0
+    profit_score = min(100, int(demand * 0.4 + max(0, est_margin) * 0.6))
+    
+    # Trend direction based on demand
+    trend = "🔥 Fuerte alza" if demand >= 85 else "📈 Creciendo" if demand >= 70 else "➡️ Estable"
+    
+    # Estimated rating based on category
+    est_rating = 4.2 + (demand / 1000) if demand > 50 else 4.0
+    
+    enriched = {
+        **n,
+        "cost_usd": cost,
+        "ship_usd": ship,
+        "ml_avg": ml,
+        "img": CATEGORY_IMAGES.get(cat, CATEGORY_IMAGES["tecnologia"]),
+        "desc": NICHE_DESCRIPTIONS.get(name, f"Producto en tendencia. Demanda: {demand}/100. Margen estimado: {est_margin:.0f}%"),
+        "source_url": f"https://www.aliexpress.com/wholesale?SearchText={name.replace(' ', '+')}",
+        "keywords": NICHE_KEYWORDS.get(cat, ""),
+        "season": NICHE_SEASONS.get(cat, "Todo el año"),
+        "trend": trend,
+        "profit_score": profit_score,
+        "est_rating": round(est_rating, 1),
+        "est_reviews": int(demand * 15 + 50),
+        "competition_level": "Alta" if demand >= 85 else "Media" if demand >= 65 else "Baja",
+        "margin_potential": f"{est_margin:.0f}%",
+    }
+    WINNING_NICHES.append(enriched)
 
 # ═══════════════════════════════════════════════════════════════
 # DB MODELS
@@ -953,10 +953,9 @@ def list_products(
              "best_strategy": p.best_strategy,
              "best_margin": p.best_margin,
              "status": p.status, "opportunity_score": p.opportunity_score,
- "image_url": p.image_url, "demand_score": p.demand_score,
- "ml_competitor_price": p.ml_competitor_price,
- "source_url": p.source_url,
- "created_at": p.created_at.isoformat() if p.created_at else None}
+             "image_url": p.image_url, "demand_score": p.demand_score,
+             "ml_competitor_price": p.ml_competitor_price,
+             "created_at": p.created_at.isoformat() if p.created_at else None}
             for p in prods]
 
 
@@ -1809,13 +1808,11 @@ class URLAnalyzeInput(BaseModel):
 class AliExpressSearchInput(BaseModel):
     query: str
     limit: int = 10
-    min_price_usd: Optional[float] = None
-    max_price_usd: Optional[float] = None
 
 @app.post("/api/hunter/analyze-url")
 async def analyze_product_url(body: URLAnalyzeInput):
     """Analyze a product URL from AliExpress or 1688 and extract pricing data"""
-    hunter = AIProductHunter()
+    hunter = ProductHunter()
     result = await hunter.analyze_url(body.url)
     if not result:
         raise HTTPException(400, "Could not analyze URL. Make sure it's a valid AliExpress or 1688 product URL.")
@@ -1826,13 +1823,8 @@ async def analyze_product_url(body: URLAnalyzeInput):
 @app.post("/api/hunter/search-aliexpress")
 async def search_aliexpress(body: AliExpressSearchInput):
     """Search AliExpress for products using real browser automation"""
-    hunter = AIProductHunter()
-    results = await hunter.search_products(
-        body.query, 
-        body.limit,
-        min_price_usd=body.min_price_usd,
-        max_price_usd=body.max_price_usd
-    )
+    hunter = ProductHunter()
+    results = await hunter.search_aliexpress(body.query, body.limit)
     return {
         "query": body.query,
         "results": results,
@@ -1854,128 +1846,197 @@ async def get_trending_products(
     max_cost: Optional[float] = None,
     mode: Optional[str] = None,
 ):
-    """Hunter endpoint — DB-first for trending, Playwright live for searches. Returns real product URLs."""
-    import logging
-    from sqlalchemy import select
-    logger = logging.getLogger("hunter")
-    logger.info("Hunter: q=%s, category=%s, min_demand=%d, min_cost=%s, max_cost=%s", q, category, min_demand, min_cost, max_cost)
+    """Real Product Hunter — searches live sources.
+    Pass ?q=auriculares to search live (Bing Shopping -> AliExpress -> mock).
+    Pass ?mode=curated to see the pre-built niche list (69 products).
+    sort_by: price | margin | cost | demand | opportunity | rating | reviews | name
+    sort_order: asc | desc
+    min_cost / max_cost: filter by USD purchase price in China
+    """
     
-    products = []
-    
-    if q:  # LIVE SEARCH — use Playwright scraper (reliable, real URLs)
-        from scrapers import AIProductHunter
-        hunter = AIProductHunter()
+    # ┌────────────────────────────────────────────────────────────────┐
+    # LIVE SEARCH MODE — the real hunter
+    # └─────────────────────────────────────────────────────────────────┘
+    if q and q.strip():
+        query = q.strip()
+        all_results = []
+        sources_used = []
+        
+        # Step 1: Bing Shopping (HTTP-only, works on Render)
         try:
-            # Map query params to scraper args
-            min_price = None
-            max_price = None
-            if min_cost is not None:
-                min_price = min_cost
-            if max_cost is not None:
-                max_price = max_cost
-            raw = await hunter.search_products(
-                q, 
-                limit * 2,
-                min_price_usd=min_price,
-                max_price_usd=max_price
-            )
-            print(f"[HUNTER] raw count={len(raw)}, sample={raw[:2] if raw else []}")
+            bing_results = await search_bing_shopping(query, limit=limit)
+            if bing_results:
+                all_results.extend(bing_results)
+                sources_used.append("bing-shopping")
+                print(f"[Hunter] Bing Shopping: {len(bing_results)} results")
         except Exception as e:
-            logger.error(f"Live search error: {e}")
-            raw = []
+            print(f"[Hunter] Bing Shopping failed: {e}")
         
-        # Filter by price
-        filtered = [p for p in raw if p.get('price_usd', 0) > 0]
-        if min_cost is not None:
-            filtered = [p for p in filtered if p.get('price_usd', 0) >= min_cost]
-        if max_cost is not None:
-            filtered = [p for p in filtered if p.get('price_usd', 0) <= max_cost]
+        # Step 2: Bing Web fallback
+        if len(all_results) < 3:
+            try:
+                web_results = await search_bing_web_products(query, limit=limit)
+                if web_results:
+                    all_results.extend(web_results)
+                    sources_used.append("bing-web")
+                    print(f"[Hunter] Bing Web: {len(web_results)} results")
+            except Exception as e:
+                print(f"[Hunter] Bing Web failed: {e}")
         
-        products = filtered
-        # Sorting
-        reverse = sort_order == "desc"
-        sort_keys = {
-            "demand": lambda x: x.get('demand', 0) or 0,
-            "price_usd": lambda x: x.get('price_usd', 0) or 0,
-            "reviews": lambda x: x.get('reviews', 0) or 0,
-        }
-        if sort_by in sort_keys:
-            products.sort(key=sort_keys[sort_by], reverse=reverse)
-    
-    else:  # TRENDING — read from DB only (no fallback, no scraper)
-        db = SessionLocal()
-        try:
-            stmt = select(Product).where(Product.demand_score >= min_demand)
-            if category:
-                stmt = stmt.where(Product.category == category)
-            # Cost filters in SQL (sum product+shipping)
-            if min_cost is not None:
-                stmt = stmt.where(Product.product_cost_usd + Product.shipping_cost_usd >= min_cost)
-            if max_cost is not None:
-                stmt = stmt.where(Product.product_cost_usd + Product.shipping_cost_usd <= max_cost)
-            # Sorting
-            sort_attr = getattr(Product, sort_by, Product.demand_score)
-            if sort_order == "desc":
-                stmt = stmt.order_by(sort_attr.desc())
-            else:
-                stmt = stmt.order_by(sort_attr.asc())
-            # Limit to avoid over-fetch
-            stmt = stmt.limit(limit * 3)
-            results = db.execute(stmt).scalars().all()
-            db.close()
+        # Step 3: AliExpress (Playwright — may OOM on Render)
+        if len(all_results) < 3:
+            try:
+                hunter = ProductHunter()
+                ali_results = await hunter.search_aliexpress(query, limit)
+                if ali_results:
+                    for r in ali_results:
+                        all_results.append({
+                            "name": r.get("name", "Unknown"),
+                            "price_usd": r.get("price_usd", 0),
+                            "image_url": r.get("image_url", ""),
+                            "product_url": r.get("product_url", ""),
+                            "rating": r.get("rating", 0),
+                            "sold_count": r.get("sold_count", 0),
+                            "source": "aliexpress",
+                        })
+                    sources_used.append("aliexpress")
+                    print(f"[Hunter] AliExpress: {len(ali_results)} results")
+            except Exception as e:
+                print(f"[Hunter] AliExpress failed: {e}")
+        
+        # Step 4: Mock fallback (realistic, keyword-aware)
+        if len(all_results) < 3:
+            mock_results = generate_mock_sourcing_data(query, limit)
+            all_results.extend(mock_results)
+            sources_used.append("mock-fallback")
+            print(f"[Hunter] Mock fallback: {len(mock_results)} results")
+        
+        # Normalize to common format
+        normalized = []
+        for r in all_results:
+            cost = r.get("price_usd", 0)
+            # Apply cost filters
+            if min_cost is not None and cost < min_cost:
+                continue
+            if max_cost is not None and cost > max_cost:
+                continue
             
-            # Build products list, KEEP ONLY REAL PRODUCT URLS (contain /item/ or /product/)
-            products = []
-            for p in results:
-                total_cost = (p.product_cost_usd or 0) + (p.shipping_cost_usd or 0)
-                raw_url = (p.source_url or "").strip()
-                # Real product URL must contain /item/ or /product/ (not just search page)
-                is_real = ("/item/" in raw_url) or ("/product/" in raw_url)
-                if not is_real:
-                    continue  # skip entries without real product link
-                products.append({
-                    "name": p.name[:150],
-                    "price_usd": round(total_cost, 2),
-                    "product_url": raw_url,
-                    "image_url": p.image_url or "",
-                    "demand": p.demand_score or 50,
-                    "rating": float(p.margin_cost_plus / 10) if p.margin_cost_plus else 3.0,
-                    "reviews": int(p.opportunity_score or p.demand_score or 0),
-                    "category": p.category,
-                })
-        except Exception as e:
-            logger.error(f"DB error in trending: {e}")
-            db.close()
-            products = []
+            # Try to enrich with real product image
+            img = r.get("image_url", "")
+            if not img:
+                # Try Bing image cache
+                img = _image_cache.get(r.get("name", ""), "")
+            
+            normalized.append({
+                "name": r.get("name", "Unknown")[:150],
+                "cat": category or "general",
+                "demand": min(95, max(50, int(70 + (r.get("sold_count", 0) / 100)))),
+                "cost_usd": cost,
+                "ship_usd": round(cost * 0.15 + 2, 2),  # 15% of cost + base
+                "ml_avg": round(cost * 3 * 42, 0) if cost > 0 else 0,  # rough ML estimate
+                "img": img,
+                "desc": r.get("name", ""),
+                "source_url": r.get("product_url", ""),
+                "rating": r.get("rating", 4.2),
+                "reviews": r.get("sold_count", 0),
+                "store": r.get("store", r.get("source", "unknown")),
+                "source": r.get("source", "unknown"),
+            })
+        
+        # Sort
+        def _sort_margin(x):
+            c = x.get("cost_usd", 0)
+            m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
+            if c > 0:
+                return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
+            return x.get("demand", 0)
+        
+        def _sort_opp(x):
+            c = x.get("cost_usd", 0)
+            m = x.get("ml_avg", 0) / 42 if x.get("ml_avg", 0) else 0
+            if c > 0:
+                return x.get("demand", 0) * 0.6 + ((m - c) / c * 100) * 0.4
+            return x.get("demand", 0)
+        
+        sort_key = {
+            "price": lambda x: x.get("cost_usd", 0),
+            "margin": _sort_margin,
+            "cost": lambda x: x.get("cost_usd", 0),
+            "demand": lambda x: x.get("demand", 0),
+            "opportunity": _sort_opp,
+            "rating": lambda x: x.get("rating", 0),
+            "reviews": lambda x: x.get("reviews", 0),
+            "name": lambda x: x.get("name", "").lower(),
+        }.get(sort_by, lambda x: x.get("demand", 0))
+        normalized.sort(key=sort_key, reverse=(sort_order != "asc"))
+        
+        return {
+            "products": normalized[:limit],
+            "count": len(normalized[:limit]),
+            "total_available": len(normalized),
+            "page": 1,
+            "total_pages": max(1, (len(normalized) + limit - 1) // limit),
+            "with_images": with_images,
+            "query": query,
+            "sources": sources_used,
+            "source": "live",
+        }
     
-    # Paginación
-    start_idx = (page - 1) * limit
-    end_idx = start_idx + limit
-    page_products = products[start_idx:end_idx]
+    # ┌────────────────────────────────────────────────────────────────┐
+    # CURATED MODE — only when explicitly requested
+    # └─────────────────────────────────────────────────────────────────┘
+    if mode == "curated":
+        products = WINNING_NICHES.copy()
+        if category:
+            products = [p for p in products if p.get("cat") == category]
+        products = [p for p in products if p.get("demand", 0) >= min_demand]
+        if min_cost is not None:
+            products = [p for p in products if p.get("cost_usd", 0) >= min_cost]
+        if max_cost is not None:
+            products = [p for p in products if p.get("cost_usd", 0) <= max_cost]
+        
+        sort_key = {
+            "price": lambda x: x.get("cost_usd", 0) + x.get("ship_usd", 0),
+            "margin": lambda x: x.get("profit_score", 0),
+            "cost": lambda x: x.get("cost_usd", 0),
+            "demand": lambda x: x.get("demand", 0),
+            "opportunity": lambda x: x.get("demand", 0) * 0.6 + x.get("profit_score", 0) * 0.4,
+            "rating": lambda x: x.get("est_rating", 0),
+            "reviews": lambda x: x.get("est_reviews", 0),
+            "name": lambda x: x.get("name", "").lower(),
+        }.get(sort_by, lambda x: x.get("demand", 0))
+        products.sort(key=sort_key, reverse=(sort_order != "asc"))
+        
+        total = len(products)
+        start = (page - 1) * limit
+        products = products[start:start + limit]
+        
+        if with_images and products:
+            products = await enrich_products_with_images(products, max_concurrent=5)
+        
+        return {
+            "products": products,
+            "count": len(products),
+            "total_available": total,
+            "page": page,
+            "total_pages": (total + limit - 1) // limit,
+            "with_images": with_images,
+            "source": "curated",
+        }
     
-    # Enriquecer con imágenes si se pide
-    if with_images:
-        # Stub for missing export
-async def find_product_image_bing(*a, **kw): return ""
-
-        for p in page_products:
-            if not p.get('image_url') and p.get('name'):
-                p['image_url'] = await find_product_image_bing(p['name'])
-    
+    # ┌────────────────────────────────────────────────────────────────┐
+    # EMPTY STATE — prompt user to search
+    # └─────────────────────────────────────────────────────────────────┘
     return {
-        "query": q or category or "general",
-        "products": page_products,
-        "count": len(products),
-        "page": page,
-        "total_pages": max(1, (len(products) + limit - 1) // limit) if limit > 0 else 0,
-        "filters_applied": {
-            "min_demand": min_demand if min_demand != 50 else None,
-            "min_cost": min_cost,
-            "max_cost": max_cost,
-        },
-        "source": "aliexpress-playwright" if q else "db",
+        "products": [],
+        "count": 0,
+        "total_available": 0,
+        "page": 1,
+        "total_pages": 0,
+        "with_images": False,
+        "source": "empty",
+        "message": "Ingresá un producto para buscar (ej: auriculares, smartwatch, lámpara). Usá ?mode=curated para ver los 69 nichos pre-cargados.",
     }
-
 
 @app.get("/api/hunter/categories")
 def get_hunter_categories():
@@ -2545,14 +2606,6 @@ class MarketingCampaign(Base):
     content = Column(Text, default="")
     status = Column(String, default="draft")  # draft, active, completed
     created_at = Column(DateTime, default=datetime.utcnow)
-
-
-
-# ═══════════════════════════════════════════════════════════════
-
-# GLOBAL INIT — load winning niches after DB models are defined
-
-WINNING_NICHES = _load_winning_niches()
 
 # Create tables
 Base.metadata.create_all(bind=engine)
