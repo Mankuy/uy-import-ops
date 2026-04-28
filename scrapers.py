@@ -3,21 +3,31 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import aiohttp
-from sqlalchemy import create_engine, text
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+# Optional imports - don't crash if missing
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
 
-print(f"\n{'='*60}")
-print(f"[INIT] scrapers.py cargado desde: {__file__}")
-print(f"{'='*60}\n")
+from sqlalchemy import create_engine, text
+
+try:
+    from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+except ImportError:
+    async_playwright = None
+    PlaywrightTimeout = Exception
 
 BASE_DIR = Path(__file__).parent
 CONFIG_PATH = BASE_DIR / "scraper_config.yaml"
 STATIC_DIR = BASE_DIR / "static" / "products"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
-with open(CONFIG_PATH) as f:
-    CFG = yaml.safe_load(f)
+# Load config with defaults if file missing
+try:
+    with open(CONFIG_PATH) as f:
+        CFG = yaml.safe_load(f)
+except FileNotFoundError:
+    CFG = {}
 
 MIN_PRICE = float(CFG.get("min_price", 1.0))
 MAX_PRICE = float(CFG.get("max_price", 100.0))
@@ -30,12 +40,15 @@ COOKIES = CFG.get("cookies", [])
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler(BASE_DIR / "hunter.log", encoding="utf-8"), logging.StreamHandler()],
+    handlers=[logging.StreamHandler()],
 )
 log = logging.getLogger("hunter")
 
 DB_PATH = BASE_DIR / "research.db"
-engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
+try:
+    engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
+except Exception:
+    engine = None
 INSERT_SQL = text("""INSERT OR IGNORE INTO products (source_url, image_url, product_cost_usd, status, created_at, updated_at)
                      VALUES (:source_url, :image_url, :product_cost_usd, 'hunter_new', datetime('now'), datetime('now'))""")
 ITEM_URL_RE = re.compile(r"https?://(?:www\.)?aliexpress\.com/item/(\d+)\.html")
