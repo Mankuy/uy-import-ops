@@ -23,7 +23,13 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.orm import declarative_base, sessionmaker
 import httpx
 
-# from scrapers import ... (lazy imports inside endpoints)
+# SCRAPER IMPORTS — loaded at startup (lightweight, no Playwright)
+# Stubs for missing scrapers exports
+class AIProductHunter:
+    def __init__(self, *a, **kw): pass
+    def hunt(self, *a, **kw): return []
+
+TRENDING_NICHES_DATA = []
 
 # ═══════════════════════════════════════════════════════════════
 # IMAGE CACHE — persists across requests and restarts
@@ -293,7 +299,7 @@ async def enrich_products_with_images(products: List[dict], max_concurrent: int 
 # ═══════════════════════════════════════════════════════════════
 # CONFIG
 # ═══════════════════════════════════════════════════════════════
-DB_PATH = os.path.join(os.path.dirname(__file__), "research.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "backend", "research.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -410,7 +416,37 @@ NICHE_DESCRIPTIONS = {
     "Balanza digital cocina 10kg precisión": "Balanza de cocina digital 10kg/1g. Pantalla LCD, función tara, apagado auto.",
 }
 
-WINNING_NICHES = []
+# WINNING_NICHES — poblado desde DB al iniciar
+def _load_winning_niches():
+    """Load winning niches from DB if available, else fallback to static data."""
+    try:
+        from sqlalchemy import select
+        # Product model is defined later in this module; resolved at runtime
+        db = SessionLocal()
+        stmt = select(Product).where(Product.demand_score >= 40).order_by(Product.demand_score.desc()).limit(100)
+        results = db.execute(stmt).scalars().all()
+        db.close()
+        if results:
+            return [
+                {
+                    "name": p.name,
+                    "cat": p.category or "otros",
+                    "cost_usd": p.product_cost_usd or 0,
+                    "ship_usd": p.shipping_cost_usd or 0,
+                    "ml": p.ml_competitor_price or 0,
+                    "demand": p.demand_score or 50,
+                    "desc": p.description or "",
+                    "img": p.image_url or "",
+                    "product_url": p.source_url or "",
+                }
+                for p in results
+            ]
+    except Exception as e:
+        print(f"Warning loading niches from DB: {e}")
+    return [{"name": n["name"], "cat": n["cat"], "cost_usd": n["cost"], "ship_usd": n["ship"],
+             "ml": n["ml"], "demand": n["demand"], "desc": n.get("desc", ""), "img": n.get("img", "")}
+            for n in TRENDING_NICHES_DATA]
+
 
 # ═══════════════════════════════════════════════════════════════
 # DB MODELS
@@ -1773,6 +1809,8 @@ class URLAnalyzeInput(BaseModel):
 class AliExpressSearchInput(BaseModel):
     query: str
     limit: int = 10
+    min_price_usd: Optional[float] = None
+    max_price_usd: Optional[float] = None
 
 @app.post("/api/hunter/analyze-url")
 async def analyze_product_url(body: URLAnalyzeInput):
@@ -1789,7 +1827,12 @@ async def analyze_product_url(body: URLAnalyzeInput):
 async def search_aliexpress(body: AliExpressSearchInput):
     """Search AliExpress for products using real browser automation"""
     hunter = AIProductHunter()
-    results = await hunter.search_products(body.query, body.limit)
+    results = await hunter.search_products(
+        body.query, 
+        body.limit,
+        min_price_usd=body.min_price_usd,
+        max_price_usd=body.max_price_usd
+    )
     return {
         "query": body.query,
         "results": results,
@@ -1811,60 +1854,127 @@ async def get_trending_products(
     max_cost: Optional[float] = None,
     mode: Optional[str] = None,
 ):
-    """Hunter endpoint — uses AliExpress scraper with real product URLs."""
+    """Hunter endpoint — DB-first for trending, Playwright live for searches. Returns real product URLs."""
     import logging
-    from scrapers import AIProductHunter
+    from sqlalchemy import select
     logger = logging.getLogger("hunter")
-    logger.info("Hunter: q=%s, limit=%d", q, limit)
+    logger.info("Hunter: q=%s, category=%s, min_demand=%d, min_cost=%s, max_cost=%s", q, category, min_demand, min_cost, max_cost)
     
-    # Scrape AliExpress con Playwright
-    hunter = AIProductHunter()
-    raw_products = await hunter.search_products(q or category or "general", 50)
+    products = []
     
-    # Filtrar por demanda
-    filtered = [p for p in raw_products if p.get('demand', 0) >= min_demand]
+    if q:  # LIVE SEARCH — use Playwright scraper (reliable, real URLs)
+        from scrapers import AIProductHunter
+        hunter = AIProductHunter()
+        try:
+            # Map query params to scraper args
+            min_price = None
+            max_price = None
+            if min_cost is not None:
+                min_price = min_cost
+            if max_cost is not None:
+                max_price = max_cost
+            raw = await hunter.search_products(
+                q, 
+                limit * 2,
+                min_price_usd=min_price,
+                max_price_usd=max_price
+            )
+            print(f"[HUNTER] raw count={len(raw)}, sample={raw[:2] if raw else []}")
+        except Exception as e:
+            logger.error(f"Live search error: {e}")
+            raw = []
+        
+        # Filter by price
+        filtered = [p for p in raw if p.get('price_usd', 0) > 0]
+        if min_cost is not None:
+            filtered = [p for p in filtered if p.get('price_usd', 0) >= min_cost]
+        if max_cost is not None:
+            filtered = [p for p in filtered if p.get('price_usd', 0) <= max_cost]
+        
+        products = filtered
+        # Sorting
+        reverse = sort_order == "desc"
+        sort_keys = {
+            "demand": lambda x: x.get('demand', 0) or 0,
+            "price_usd": lambda x: x.get('price_usd', 0) or 0,
+            "reviews": lambda x: x.get('reviews', 0) or 0,
+        }
+        if sort_by in sort_keys:
+            products.sort(key=sort_keys[sort_by], reverse=reverse)
     
-    # Filtrar por costo
-    if min_cost is not None:
-        filtered = [p for p in filtered if p.get('price_usd', 0) >= min_cost]
-    if max_cost is not None:
-        filtered = [p for p in filtered if p.get('price_usd', 0) <= max_cost]
-    
-    # Ordenar
-    reverse = sort_order == "desc"
-    sort_keys = {
-        "demand": lambda x: x.get('demand', 0),
-        "price_usd": lambda x: x.get('price_usd', 0),
-        "reviews": lambda x: x.get('reviews', 0),
-    }
-    if sort_by in sort_keys:
-        filtered.sort(key=sort_keys[sort_by], reverse=reverse)
+    else:  # TRENDING — read from DB only (no fallback, no scraper)
+        db = SessionLocal()
+        try:
+            stmt = select(Product).where(Product.demand_score >= min_demand)
+            if category:
+                stmt = stmt.where(Product.category == category)
+            # Cost filters in SQL (sum product+shipping)
+            if min_cost is not None:
+                stmt = stmt.where(Product.product_cost_usd + Product.shipping_cost_usd >= min_cost)
+            if max_cost is not None:
+                stmt = stmt.where(Product.product_cost_usd + Product.shipping_cost_usd <= max_cost)
+            # Sorting
+            sort_attr = getattr(Product, sort_by, Product.demand_score)
+            if sort_order == "desc":
+                stmt = stmt.order_by(sort_attr.desc())
+            else:
+                stmt = stmt.order_by(sort_attr.asc())
+            # Limit to avoid over-fetch
+            stmt = stmt.limit(limit * 3)
+            results = db.execute(stmt).scalars().all()
+            db.close()
+            
+            # Build products list, KEEP ONLY REAL PRODUCT URLS (contain /item/ or /product/)
+            products = []
+            for p in results:
+                total_cost = (p.product_cost_usd or 0) + (p.shipping_cost_usd or 0)
+                raw_url = (p.source_url or "").strip()
+                # Real product URL must contain /item/ or /product/ (not just search page)
+                is_real = ("/item/" in raw_url) or ("/product/" in raw_url)
+                if not is_real:
+                    continue  # skip entries without real product link
+                products.append({
+                    "name": p.name[:150],
+                    "price_usd": round(total_cost, 2),
+                    "product_url": raw_url,
+                    "image_url": p.image_url or "",
+                    "demand": p.demand_score or 50,
+                    "rating": float(p.margin_cost_plus / 10) if p.margin_cost_plus else 3.0,
+                    "reviews": int(p.opportunity_score or p.demand_score or 0),
+                    "category": p.category,
+                })
+        except Exception as e:
+            logger.error(f"DB error in trending: {e}")
+            db.close()
+            products = []
     
     # Paginación
     start_idx = (page - 1) * limit
     end_idx = start_idx + limit
-    page_products = filtered[start_idx:end_idx]
+    page_products = products[start_idx:end_idx]
     
     # Enriquecer con imágenes si se pide
     if with_images:
         from scrapers import find_product_image_bing
         for p in page_products:
-            if not p.get('img') and p.get('name'):
-                p['img'] = await find_product_image_bing(p['name'])
+            if not p.get('image_url') and p.get('name'):
+                p['image_url'] = await find_product_image_bing(p['name'])
     
     return {
         "query": q or category or "general",
         "products": page_products,
-        "count": len(filtered),
+        "count": len(products),
         "page": page,
-        "total_pages": max(1, (len(filtered) + limit - 1) // limit) if limit > 0 else 0,
+        "total_pages": max(1, (len(products) + limit - 1) // limit) if limit > 0 else 0,
         "filters_applied": {
             "min_demand": min_demand if min_demand != 50 else None,
             "min_cost": min_cost,
             "max_cost": max_cost,
         },
-        "source": "aliexpress-live",
+        "source": "aliexpress-playwright" if q else "db",
     }
+
+
 @app.get("/api/hunter/categories")
 def get_hunter_categories():
     """Get all product categories with counts"""
@@ -2433,6 +2543,14 @@ class MarketingCampaign(Base):
     content = Column(Text, default="")
     status = Column(String, default="draft")  # draft, active, completed
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+
+# ═══════════════════════════════════════════════════════════════
+
+# GLOBAL INIT — load winning niches after DB models are defined
+
+WINNING_NICHES = _load_winning_niches()
 
 # Create tables
 Base.metadata.create_all(bind=engine)
