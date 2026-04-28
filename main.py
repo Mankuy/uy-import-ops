@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
+from fastapi import Request
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -815,6 +816,48 @@ app.add_middleware(
 )
 
 # Serve generated design images
+
+
+# ─── HUNTER SEARCH ───
+from urllib.parse import quote_plus
+
+@app.post("/api/hunter/search")
+async def hunter_search_endpoint(request: Request):
+    try:
+        body = await request.json()
+    except:
+        body = {}
+    kw = body.get("keywords", "phone case")
+    mn = body.get("min_price")
+    mx = body.get("max_price")
+    mp = body.get("max_products", 20)
+    
+    import httpx, re as _re
+    query = quote_plus(kw)
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    
+    async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=20.0) as client:
+        r = await client.get(f"https://www.banggood.com/search/{query}.html")
+        html = r.text
+        prods = _re.findall(r'href="(https://www\\.banggood\\.com/[^"]*-p-\\d+[^"]*)"[^>]*title="([^"]+)"', html)
+        results = []
+        for url, title in prods:
+            if len(results) >= mp: break
+            pid_m = _re.search(r"-p-(\\d+)", url)
+            p = 0.0
+            try:
+                pr = await client.get(url.split("?")[0], timeout=10.0)
+                for pat in [r'Solo US\\$([\\d,.]+)', r'US\\$([\\d]+\\.[\\d]{2})']:
+                    m = _re.search(pat, pr.text)
+                    if m:
+                        try: p = float(m.group(1).replace(",", "")); break
+                        except: pass
+            except: pass
+            if mn is not None and p < mn: continue
+            if mx is not None and p > mx: continue
+            results.append({"product_id": pid_m.group(1) if pid_m else "?", "url": url.split("?")[0], "title": title[:150], "price_usd": p, "image_url": "", "source": "banggood", "platform": "banggood"})
+        return {"added": len(results), "platform": "banggood", "keywords": kw, "products": results, "success": True}
+
 app.mount("/generated_designs", StaticFiles(directory=_DESIGNS_DIR), name="generated_designs")
 
 # Serve frontend static files (single-page app) — explicit route to avoid shadowing API
