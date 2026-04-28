@@ -1708,37 +1708,37 @@ async function loadTopOpportunities() {
 // HUNTER
 // ═══════════════════════════════════════════════════════════════
 async function runHunter() {
-  const keywords = document.getElementById('hunter-keywords')?.value || 'phone case';
-  const minPrice = document.getElementById('hunter-min-price')?.value || '';
-  const maxPrice = document.getElementById('hunter-max-price')?.value || '';
+  var kw = document.getElementById('hunter-keywords') ? document.getElementById('hunter-keywords').value : 'phone case';
+  var mn = document.getElementById('hunter-min-price') ? document.getElementById('hunter-min-price').value : '';
+  var mx = document.getElementById('hunter-max-price') ? document.getElementById('hunter-max-price').value : '';
   showTab('hunter');
-  const btn = document.getElementById('hunter-btn');
-  const resultsDiv = document.getElementById('hunter-results');
-  if (!resultsDiv) return;
+  var btn = document.getElementById('hunter-btn');
+  var res = document.getElementById('hunter-results');
+  if (!res) return;
   btn.disabled = true; btn.textContent = 'Buscando...';
-  resultsDiv.innerHTML = '<div class="text-center py-8"><div class="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full mx-auto mb-4"></div><p class="text-text-muted">Buscando productos...</p></div>';
+  res.innerHTML = '<p class="text-center py-8 text-text-muted">Buscando productos...</p>';
   try {
-    const body = {platform:"banggood",keywords,max_products:20};
-    if (minPrice) body.min_price = parseFloat(minPrice);
-    if (maxPrice) body.max_price = parseFloat(maxPrice);
-    const r = await fetch(API+"/hunter/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const data = await r.json();
+    var body = {platform: 'banggood', keywords: kw, max_products: 20};
+    if (mn) body.min_price = parseFloat(mn);
+    if (mx) body.max_price = parseFloat(mx);
+    var r = await fetch(API + '/hunter/search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    var data = await r.json();
     if (data.products && data.products.length > 0) {
-      resultsDiv.innerHTML = '<div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">'+
-        data.products.map(p => '<div class="glass rounded-xl p-4 border border-accent-500/20">'+
-          (p.image_url?'<img src="'+p.image_url+'" class="w-full h-40 object-contain rounded-lg mb-3" onerror="this.style.display='none'">':'<div class="w-full h-40 bg-gradient-to-br from-accent-500/10 to-brand-500/10 rounded-lg mb-3 flex items-center justify-center text-4xl">📦</div>')+
-          '<h4 class="font-semibold text-sm mb-2 line-clamp-2">'+p.title+'</h4>'+
-          '<p class="text-accent-400 font-bold text-lg">$'+p.price_usd.toFixed(2)+'</p>'+
-          '<a href="'+p.url+'" target="_blank" class="text-xs text-text-muted hover:text-accent-400 mt-1 block truncate">'+p.url+'</a>'+
-        '</div>').join('')+'</div>';
+      var cards = '';
+      for (var i = 0; i < data.products.length; i++) {
+        var p = data.products[i];
+        var imgHtml = p.image_url ? '<img src="' + p.image_url + '" class="w-full h-40 object-contain rounded-lg mb-3" onerror="this.style.display=\"none\"">' : '<div class="w-full h-40 bg-gradient-to-br from-accent-500/10 to-brand-500/10 rounded-lg mb-3 flex items-center justify-center text-4xl">Box</div>';
+        cards += '<div class="glass rounded-xl p-4 border border-accent-500/20">' + imgHtml + '<h4 class="font-semibold text-sm mb-2 line-clamp-2">' + p.title + '</h4><p class="text-accent-400 font-bold text-lg">$' + p.price_usd.toFixed(2) + '</p><a href="' + p.url + '" target="_blank" class="text-xs text-text-muted hover:text-accent-400 mt-1 block truncate">' + p.url + '</a></div>';
+      }
+      res.innerHTML = '<div class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">' + cards + '</div>';
     } else {
-      resultsDiv.innerHTML = '<div class="text-center py-8 text-text-muted"><p class="text-4xl mb-3">😕</p><p>No se encontraron productos'+(keywords?' para "'+keywords+'"':'')+'.</p></div>';
+      res.innerHTML = '<p class="text-center py-8 text-text-muted">No se encontraron productos para "' + kw + '"</p>';
     }
   } catch(e) {
-    resultsDiv.innerHTML = '<div class="text-center py-8 text-red-400"><p class="text-4xl mb-3">⚠️</p><p>Error: '+e.message+'</p></div>';
+    res.innerHTML = '<p class="text-center py-8 text-red-400">Error: ' + e.message + '</p>';
   }
-  btn.disabled = false; btn.textContent = '🔍 Hunter Ahora';
-}
+  btn.disabled = false; btn.textContent = 'Hunter Ahora';
+}}
 
 async function analyzeURL() {
   const url = document.getElementById('analyze-url-input').value.trim();
