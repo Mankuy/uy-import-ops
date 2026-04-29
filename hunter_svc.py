@@ -56,6 +56,68 @@ NICHES = [
     {"id":"auto","name":"Acc. Auto","subcategories":["dash cam","soporte celular auto","aspiradora auto","inflador neumaticos","led interior","espejo retrovisor camara","cargador auto rapido"],"demand":"media","margin":"alto"}
 ]
 
+# English translations for trending subcategories (Banggood is in English)
+NICHES_EN = {
+    "auriculares bluetooth": "bluetooth earphone",
+    "smartwatch": "smart watch",
+    "cargador inalambrico": "wireless charger",
+    "parlante portatil": "portable speaker",
+    "power bank": "power bank",
+    "lampara led": "led lamp",
+    "proyector": "projector",
+    "camara seguridad wifi": "wifi security camera",
+    "teclado mecanico": "mechanical keyboard",
+    "mouse gamer": "gaming mouse",
+    "lampara led recargable": "rechargeable led lamp",
+    "difusor aromas": "aroma diffuser",
+    "aspiradora robot": "robot vacuum",
+    "organizador cocina": "kitchen organizer",
+    "balanza digital": "digital scale",
+    "termo electrico": "electric kettle",
+    "ventilador portatil": "portable fan",
+    "humidificador": "humidifier",
+    "tira led": "led strip",
+    "enchufe inteligente": "smart plug",
+    "banda elastica": "resistance band",
+    "yoga mat": "yoga mat",
+    "botella agua inteligente": "smart water bottle",
+    "masajeador muscular": "muscle massager",
+    "cuerda saltar": "jump rope",
+    "reloj deportivo": "sports watch",
+    "pesas ajustables": "adjustable dumbbell",
+    "rodillo abdominal": "ab roller",
+    "funda iphone": "iphone case",
+    "cable usb c": "usb c cable",
+    "cargador rapido": "fast charger",
+    "soporte auto": "car phone holder",
+    "protector pantalla": "screen protector",
+    "ring holder": "ring holder",
+    "cargador auto": "car charger",
+    "adaptador lightning": "lightning adapter",
+    "hub usb c": "usb c hub",
+    "cepillo electrico": "electric toothbrush",
+    "alisador pelo": "hair straightener",
+    "secador pelo": "hair dryer",
+    "depiladora laser": "laser hair removal",
+    "lampara uv uñas": "uv nail lamp",
+    "espejo aumento": "magnifying mirror",
+    "limpiador facial": "facial cleanser",
+    "rizador pestañas": "eyelash curler",
+    "bebedero automatico": "automatic water dispenser",
+    "comedero automatico": "automatic feeder",
+    "cama perro": "dog bed",
+    "collar gps": "gps tracker",
+    "juguete interactivo": "interactive toy",
+    "arnes reflectante": "reflective harness",
+    "dash cam": "dash cam",
+    "soporte celular auto": "car phone mount",
+    "aspiradora auto": "car vacuum",
+    "inflador neumaticos": "tire inflator",
+    "led interior": "interior led light",
+    "espejo retrovisor camara": "rear view mirror camera",
+    "cargador auto rapido": "fast car charger",
+}
+
 # ═══════════════ IMPORT CALC ═══════════════
 RATES = {
     "tecnologia":{"tariff":0.02,"iva":0.22,"handling":15},
@@ -131,24 +193,48 @@ async def scrape_bg(keywords, min_price=None, max_price=None, max_products=20):
             prod_url = prod_url.split("?")[0]
             title = re.sub(r'<[^>]+>', '', title).strip()[:200]
             
-            # Extract price from context
+            # Extract price from context - try multiple methods
             price = 0.0
             idx = html.find(prod_url)
-            ctx = html[max(0,idx-3000):min(len(html),idx+3000)]
+            ctx = html[max(0,idx-4000):min(len(html),idx+4000)]
             
-            for pat in [r'US\$\s*(\d+\.?\d*)', r'"price":\s*"?(\d+\.?\d*)', r'data-price="(\d+\.?\d*)"']:
+            # More aggressive price patterns
+            price_pats = [
+                r'US\$\s*(\d+\.?\d*)',
+                r'\$\s*(\d+\.?\d{2})',
+                r'"price":\s*"?(\d+\.?\d*)',
+                r'data-price="(\d+\.?\d*)"',
+                r'data-sale-price="(\d+\.?\d*)"',
+                r'price.*?(\d+\.\d{2})',
+                r'<span[^>]*class="[^"]*price[^"]*"[^>]*>[^<]*(\d+\.?\d*)',
+            ]
+            for pat in price_pats:
                 m = re.search(pat, ctx, re.IGNORECASE)
                 if m:
-                    try: price = float(m.group(1)); break
+                    try:
+                        pv = float(m.group(1))
+                        if 0.01 < pv < 10000:  # Sanity check
+                            price = pv; break
                     except: pass
             
+            # Try product page as fallback (with better patterns)
             if price == 0.0:
                 try:
-                    pr = await c.get(prod_url, timeout=8.0)
-                    for pat in [r'US\$\s*(\d+\.?\d*)', r'"price":\s*"?(\d+\.?\d*)']:
-                        m = re.search(pat, pr.text)
+                    pr = await c.get(prod_url, timeout=6.0)
+                    for pat in [
+                        r'US\$\s*(\d+\.?\d*)',
+                        r'"price":\s*"?(\d+\.?\d*)',
+                        r'"productPrice":\s*"?(\d+\.?\d*)',
+                        r'"salePrice":\s*"?(\d+\.?\d*)',
+                        r'"originalPrice":\s*"?\$?(\d+\.?\d*)',
+                        r'<span[^>]*class="[^"]*price[^"]*"[^>]*>[^<]*\$\s*(\d+\.?\d*)',
+                    ]:
+                        m = re.search(pat, pr.text, re.IGNORECASE)
                         if m:
-                            try: price = float(m.group(1)); break
+                            try:
+                                pv = float(m.group(1))
+                                if 0.01 < pv < 10000:
+                                    price = pv; break
                             except: pass
                 except: pass
             
@@ -156,10 +242,17 @@ async def scrape_bg(keywords, min_price=None, max_price=None, max_products=20):
             if max_price is not None and price > max_price: continue
             
             img = ""
-            for p in [r'src="(https://[^"]*imgaz[^"]*\.(?:jpg|jpeg|png|webp))"',
-                      r'src="(https://[^"]*\.(?:jpg|jpeg|png|webp))"']:
+            for p in [
+                r'src="(https://[^"]*imgaz[^"]*\.(?:jpg|jpeg|png|webp))"',
+                r'data-src="(https://[^"]*\.(?:jpg|jpeg|png|webp))"',
+                r'src="(https://[^"]*\.(?:jpg|jpeg|png|webp))"',
+                r'<img[^>]*src="(https://[^"]*\.(?:jpg|jpeg|png|webp))"',
+            ]:
                 m = re.search(p, ctx, re.IGNORECASE)
-                if m: img = m.group(1); break
+                if m:
+                    candidate = m.group(1)
+                    if 'icon' not in candidate.lower() and 'logo' not in candidate.lower():
+                        img = candidate; break
             
             pid = re.search(r'-p-(\d+)', prod_url)
             
@@ -194,14 +287,39 @@ async def hunter_search(request: Request):
     try: body = await request.json()
     except: body = {}
     kw = body.get("keywords","").strip()
-    # If no keywords, pick a random trending subcategory
+    import random
+    
+    # If no keywords, try up to 5 random trending keywords until we find products
     if not kw:
-        import random
         all_subs = []
         for n in NICHES:
             all_subs.extend(n["subcategories"])
-        kw = random.choice(all_subs) if all_subs else "auriculares bluetooth"
-    return await scrape_bg(kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
+        random.shuffle(all_subs)
+        candidates = all_subs[:10] if len(all_subs) >= 10 else all_subs
+        
+        for candidate in candidates[:3]:
+            en_kw = NICHES_EN.get(candidate, candidate)
+            result = await scrape_bg(en_kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
+            if result.get("added", 0) > 0:
+                result["keywords"] = candidate
+                result["searched_as"] = en_kw
+                return result
+        
+        return {"added": 0, "keywords": "varios", "products": [], "success": True, "message": "No se encontraron productos en ese rango de precio. Amplia el rango o usa palabras clave en ingles."}
+    
+    # User provided keywords - try English first
+    en_kw = NICHES_EN.get(kw, kw)
+    result = await scrape_bg(en_kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
+    if result.get("added", 0) > 0:
+        result["searched_as"] = en_kw
+        return result
+    # Try original Spanish
+    if en_kw != kw:
+        result = await scrape_bg(kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
+        result["searched_as"] = kw
+        return result
+    result["searched_as"] = en_kw
+    return result
 
 @app.get("/api/products")
 def products(limit:int=50, offset:int=0, source:str=None, category:str=None):
