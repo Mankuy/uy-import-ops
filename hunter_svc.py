@@ -7,6 +7,7 @@ from urllib.parse import quote_plus
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 import httpx
 
 app = FastAPI(title="Hunter API v2")
@@ -197,6 +198,11 @@ def stats():
             "avg_price_usd": round(avg_price, 2),
             "by_source": {s: c for s, c in by_source}
         }
+
+# ─── Static Frontend ───
+STATIC_DIR = os.path.join(BASE, "static")
+if os.path.exists(os.path.join(STATIC_DIR, "index.html")):
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
