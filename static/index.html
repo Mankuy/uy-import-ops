@@ -1,405 +1,338 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>UY Import Ops — Hunter Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>UYHunter — Product Sourcing</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{slate:{850:'#151e2e',900:'#0f172a',950:'#020617'},brand:{400:'#38bdf8',500:'#0ea5e9',600:'#0284c7'},accent:{400:'#4ade80',500:'#22c55e'},warning:'#f59e0b',danger:'#ef4444'}}}}</script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-*{font-family:'Inter',system-ui,sans-serif}
-body{background:#0f172a;color:#e2e8f0}
-.glass{background:rgba(30,41,59,.6);backdrop-filter:blur(16px);border:1px solid rgba(148,163,184,.08)}
-.card{background:linear-gradient(135deg,rgba(30,41,59,.7),rgba(15,23,42,.7));border:1px solid rgba(148,163,184,.06);border-radius:1rem;padding:1.5rem;transition:all .3s}
-.card:hover{border-color:rgba(56,189,248,.2);transform:translateY(-1px)}
-.glow{box-shadow:0 0 20px rgba(56,189,248,.08)}
-.glow-green{box-shadow:0 0 20px rgba(34,197,94,.08)}
-.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.625rem 1.25rem;border-radius:.75rem;font-weight:600;font-size:.875rem;cursor:pointer;transition:all .2s;border:none;outline:none}
-.btn-primary{background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff}.btn-primary:hover{background:linear-gradient(135deg,#0ea5e9,#0284c7);box-shadow:0 0 20px rgba(14,165,233,.3)}
-.btn-accent{background:linear-gradient(135deg,#059669,#047857);color:#fff}.btn-accent:hover{background:linear-gradient(135deg,#10b981,#059669)}
-input,select,textarea{border-radius:.75rem;padding:.625rem .875rem;background:rgba(15,23,42,.8);border:1px solid rgba(148,163,184,.15);color:#e2e8f0;outline:none;transition:border .2s;font-size:.875rem}
-input:focus,select:focus,textarea:focus{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.1)}
-.nav-btn{display:flex;align-items:center;gap:.625rem;padding:.75rem 1rem;border-radius:.75rem;font-weight:500;cursor:pointer;transition:all .2s;color:#94a3b8;font-size:.875rem}
-.nav-btn:hover{background:rgba(30,41,59,.6);color:#e2e8f0}
-.nav-btn.active{background:rgba(2,132,199,.15);color:#38bdf8;font-weight:600}
-.tab{display:none}.tab.active{display:block}
-.spinner{width:24px;height:24px;border:3px solid rgba(148,163,184,.15);border-top-color:#38bdf8;border-radius:50%;animation:spin .6s linear infinite}
+:root{
+  --bg-deep:#08090a;--bg-panel:#0f1011;--bg-surface:#191a1b;--bg-elevated:#222325;
+  --text-primary:#f7f8f8;--text-secondary:#d0d6e0;--text-tertiary:#8a8f98;--text-quaternary:#62666d;
+  --brand:#5e6ad2;--brand-hover:#828fff;--accent:#7170ff;
+  --border-subtle:rgba(255,255,255,.05);--border-std:rgba(255,255,255,.08);
+  --green:#10b981;--red:#ef4444;--amber:#f59e0b;
+  --radius-sm:4px;--radius:6px;--radius-md:8px;--radius-lg:12px;--radius-xl:16px;--radius-full:9999px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-deep);color:var(--text-secondary);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+#app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:240px;flex-shrink:0;background:var(--bg-panel);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;padding:12px}
+.sidebar-logo{padding:12px 8px 20px;font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--text-primary)}
+.sidebar-logo span{color:var(--accent)}
+.sidebar-nav{flex:1;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--radius);font-size:13px;font-weight:500;color:var(--text-tertiary);cursor:pointer;transition:all .15s;user-select:none}
+.nav-item:hover{background:rgba(255,255,255,.03);color:var(--text-secondary)}
+.nav-item.active{background:rgba(94,106,210,.12);color:var(--accent);font-weight:600}
+.nav-icon{font-size:15px;width:22px;text-align:center;flex-shrink:0}
+.sidebar-footer{padding:12px 8px;border-top:1px solid var(--border-subtle);font-size:11px;color:var(--text-quaternary);font-weight:500}
+.main{flex:1;overflow:auto;padding:32px}
+.page{display:none;animation:fadeIn .25s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+h1{font-size:24px;font-weight:600;color:var(--text-primary);letter-spacing:-.3px;margin-bottom:4px}
+h2{font-size:18px;font-weight:600;color:var(--text-primary);letter-spacing:-.2px;margin-bottom:12px}
+h3{font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:8px}
+.subtitle{font-size:14px;color:var(--text-tertiary);margin-bottom:24px}
+.card{background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-md);padding:20px;transition:all .2s}
+.card:hover{border-color:rgba(255,255,255,.12)}
+.stat-card{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:20px;transition:all .2s}
+.stat-card:hover{border-color:var(--border-std);transform:translateY(-1px)}
+.stat-label{font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.5px;line-height:1.1}
+.stat-value.accent{color:var(--accent)}.stat-value.green{color:var(--green)}.stat-value.amber{color:var(--amber)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:none;outline:none;white-space:nowrap}
+.btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{background:var(--brand-hover)}
+.btn-ghost{background:rgba(255,255,255,.02);color:var(--text-secondary);border:1px solid var(--border-std)}.btn-ghost:hover{background:rgba(255,255,255,.05);color:var(--text-primary)}
+.btn-sm{padding:4px 10px;font-size:12px}
+input,select{font-family:inherit;font-size:13px;padding:8px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border-std);border-radius:var(--radius);color:var(--text-primary);outline:none;transition:border .15s}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,106,210,.1)}
+input::placeholder{color:var(--text-quaternary)}
+select{appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238a8f98'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.flex-between{display:flex;align-items:center;justify-content:space-between}
+.gap-2{gap:8px}.gap-3{gap:12px}.mb-4{margin-bottom:16px}.mb-6{margin-bottom:24px}
+.product-card{display:flex;gap:16px;padding:16px;background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-lg);transition:all .15s;animation:slideUp .3s ease backwards}
+.product-card:hover{border-color:rgba(255,255,255,.12)}
+.product-card:nth-child(1){animation-delay:0s}.product-card:nth-child(2){animation-delay:.04s}.product-card:nth-child(3){animation-delay:.08s}.product-card:nth-child(4){animation-delay:.12s}.product-card:nth-child(5){animation-delay:.16s}.product-card:nth-child(6){animation-delay:.2s}.product-card:nth-child(7){animation-delay:.24s}.product-card:nth-child(8){animation-delay:.28s}.product-card:nth-child(9){animation-delay:.32s}.product-card:nth-child(10){animation-delay:.36s}
+@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.product-img{width:80px;height:80px;flex-shrink:0;border-radius:var(--radius);background:var(--bg-panel);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:28px}
+.product-img img{width:100%;height:100%;object-fit:cover}
+.product-info{flex:1;min-width:0}
+.product-title{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.product-title a{color:inherit;text-decoration:none}.product-title a:hover{color:var(--accent)}
+.product-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500}
+.badge-source{background:rgba(94,106,210,.12);color:var(--accent)}
+.badge-cat{background:rgba(255,255,255,.04);color:var(--text-tertiary)}
+.product-id{font-size:11px;color:var(--text-quaternary);font-family:'JetBrains Mono',monospace}
+.product-price{text-align:right;flex-shrink:0}
+.price-value{font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px}
+.price-label{font-size:11px;color:var(--text-quaternary)}
+.hunter-form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
+.hunter-form .field{display:flex;flex-direction:column;gap:4px}
+.hunter-form label{font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;letter-spacing:.3px}
+.status-ok{color:var(--green);font-size:14px;font-weight:500}
+.status-err{color:var(--red);font-size:14px;font-weight:500}
+.calc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+.calc-item{padding:12px;background:var(--bg-panel);border-radius:var(--radius);text-align:center}
+.calc-item .label{font-size:11px;color:var(--text-quaternary);margin-bottom:4px}
+.calc-item .value{font-size:16px;font-weight:600;color:var(--text-primary)}
+.calc-total{padding:16px 20px;border-radius:var(--radius-lg);margin-bottom:12px}
+.calc-total.primary{background:rgba(94,106,210,.08);border:1px solid rgba(94,106,210,.15)}
+.calc-total.green-bg{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15)}
+.calc-total .total-label{font-size:12px;color:var(--text-tertiary)}
+.calc-total .total-value{font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.5px}
+.calc-total .total-sub{font-size:16px;font-weight:600;color:var(--accent)}
+.calc-total.green-bg .total-value,.calc-total.green-bg .total-sub{color:var(--green)}
+.niche-card{padding:20px;background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-lg);transition:all .15s}
+.niche-card:hover{border-color:rgba(255,255,255,.12)}
+.niche-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.niche-name{font-size:15px;font-weight:600;color:var(--text-primary)}
+.niche-badge{font-size:11px;padding:3px 10px;border-radius:var(--radius-full);font-weight:600}
+.niche-badge.high{background:rgba(16,185,129,.12);color:var(--green)}
+.niche-badge.medium{background:rgba(245,158,11,.12);color:var(--amber)}
+.niche-tags{display:flex;flex-wrap:wrap;gap:6px}
+.niche-tag{font-size:12px;padding:4px 10px;background:var(--bg-panel);border-radius:var(--radius-full);color:var(--text-tertiary);cursor:pointer;transition:all .15s;border:1px solid transparent}
+.niche-tag:hover{color:var(--text-primary);border-color:var(--border-std)}
+.ml-card{padding:16px;background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-lg);display:flex;justify-content:space-between;align-items:center}
+.ml-title{font-size:14px;font-weight:500;color:var(--text-primary)}
+.ml-price{font-size:18px;font-weight:700;color:var(--amber)}
+.spinner{width:18px;height:18px;border:2px solid var(--border-std);border-top-color:var(--accent);border-radius:50%;animation:spin .5s linear infinite;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.animate-in{animation:fadeIn .4s ease-out}
-.result-card{animation:fadeIn .3s ease-out;animation-fill-mode:both}
-.result-card:nth-child(1){animation-delay:0s}.result-card:nth-child(2){animation-delay:.05s}.result-card:nth-child(3){animation-delay:.1s}.result-card:nth-child(4){animation-delay:.15s}.result-card:nth-child(5){animation-delay:.2s}
-.stat-value{font-size:2rem;font-weight:700;line-height:1.2}
-::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(148,163,184,.2);border-radius:3px}
-.toast{position:fixed;top:1rem;right:1rem;z-index:100;padding:.75rem 1.25rem;border-radius:.75rem;font-weight:500;animation:fadeIn .3s ease-out;font-size:.875rem}
-.toast-success{background:#065f46;border:1px solid #059669;color:#d1fae5}
-.toast-error{background:#7f1d1d;border:1px solid #dc2626;color:#fee2e2}
+.loading-state{display:flex;align-items:center;gap:8px;padding:16px 0;color:var(--text-tertiary);font-size:14px}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-quaternary)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.chart-wrap{position:relative;width:100%;height:220px}
+.chart-wrap canvas{width:100%!important;height:100%!important}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:3px}
+.toast{position:fixed;top:16px;right:16px;padding:10px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;z-index:100;animation:fadeIn .25s ease}
+.toast-ok{background:#065f46;border:1px solid #059669;color:#d1fae5}
+.toast-err{background:#7f1d1d;border:1px solid #dc2626;color:#fee2e2}
 </style>
 </head>
-<body class="min-h-screen">
-<div class="flex h-screen">
-<!-- Sidebar -->
-<aside class="w-64 flex-shrink-0 border-r border-slate-700/30 flex flex-col" style="background:rgba(15,23,42,.97)">
-  <div class="p-5 border-b border-slate-700/30">
-    <div class="text-xl font-extrabold tracking-tight">
-      <span class="text-brand-400">UY</span><span>Hunter</span>
-    </div>
-    <div class="text-xs text-slate-500 mt-1">Product Sourcing para importar</div>
-  </div>
-  <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
-    <div class="nav-btn active" onclick="switchTab('dashboard')" id="nav-dashboard">📊 Dashboard</div>
-    <div class="nav-btn" onclick="switchTab('hunter')" id="nav-hunter"><span>🤖</span> Product Hunter</div>
-    <div class="nav-btn" onclick="switchTab('products')" id="nav-products">📦 Productos</div>
-    <div class="nav-btn" onclick="switchTab('calculator')" id="nav-calculator">🧮 Calculadora</div>
-    <div class="nav-btn" onclick="switchTab('ml')" id="nav-ml">🔍 ML Uruguay</div>
-    <div class="nav-btn" onclick="switchTab('niches')" id="nav-niches">🔥 Tendencias</div>
-  </nav>
-  <div class="p-3 border-t border-slate-700/30">
-    <div class="text-xs text-slate-600" id="api-status">Conectando...</div>
-  </div>
-</aside>
-
-<!-- Main -->
-<main class="flex-1 overflow-auto">
-<div class="max-w-7xl mx-auto p-6 lg:p-8">
-
-<!-- DASHBOARD -->
-<div class="tab active" id="tab-dashboard">
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h1 class="text-2xl font-bold">Dashboard</h1>
-      <p class="text-slate-400 text-sm mt-1">Resumen de tu operación de importación</p>
-    </div>
-    <button class="btn btn-primary" onclick="switchTab('hunter')">🚀 Buscar Productos</button>
-  </div>
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="card glow"><div class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Productos</div><div class="stat-value text-white" id="d-total">0</div></div>
-    <div class="card glow"><div class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Precio Promedio</div><div class="stat-value text-brand-400" id="d-avg">$0</div></div>
-    <div class="card glow"><div class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Últimos 7 días</div><div class="stat-value text-accent-400" id="d-recent">0</div></div>
-    <div class="card glow"><div class="text-slate-400 text-xs uppercase tracking-wider font-semibold mb-1">Fuentes</div><div class="stat-value text-warning" id="d-sources">0</div></div>
-  </div>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="card"><h3 class="font-semibold mb-4">Productos por Categoría</h3><canvas id="catChart" height="200"></canvas></div>
-    <div class="card"><h3 class="font-semibold mb-4">Distribución de Precios</h3><canvas id="priceChart" height="200"></canvas></div>
-  </div>
-</div>
-
-<!-- PRODUCT HUNTER -->
-<div class="tab" id="tab-hunter">
-  <h1 class="text-2xl font-bold mb-1">Product Hunter</h1>
-  <p class="text-slate-400 text-sm mb-6">Encontrá productos en Banggood para importar a Uruguay</p>
-  <div class="card mb-6">
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-      <div class="md:col-span-2">
-        <label class="block text-xs text-slate-400 mb-1 font-medium">¿Qué producto buscás?</label>
-        <input type="text" id="h-kw" value="auriculares bluetooth" class="w-full" placeholder="Ej: smartwatch, lampara led, funda iphone...">
-      </div>
-      <div><label class="block text-xs text-slate-400 mb-1 font-medium">Precio min $</label><input type="number" id="h-min" value="0" step="0.01"></div>
-      <div><label class="block text-xs text-slate-400 mb-1 font-medium">Precio max $</label><input type="number" id="h-max" placeholder="∞" step="0.01"></div>
-      <div class="flex gap-2">
-        <select id="h-limit" class="flex-1"><option>5</option><option selected>10</option><option>20</option><option>30</option></select>
-        <button class="btn btn-primary" onclick="runHunter()" id="h-btn">🔍 Buscar</button>
-      </div>
-    </div>
-  </div>
-  <div id="h-status" class="mb-4"></div>
-  <div id="h-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-  <div id="h-empty" class="card text-center py-12 text-slate-500">
-    <div class="text-4xl mb-3">🔍</div>
-    <div>Buscá productos para empezar a encontrar oportunidades de importación</div>
-  </div>
-</div>
-
-<!-- PRODUCTS -->
-<div class="tab" id="tab-products">
-  <h1 class="text-2xl font-bold mb-1">Productos</h1>
-  <p class="text-slate-400 text-sm mb-6">Pipeline de productos encontrados</p>
-  <div id="p-list" class="space-y-3"></div>
-</div>
-
-<!-- CALCULATOR -->
-<div class="tab" id="tab-calculator">
-  <h1 class="text-2xl font-bold mb-1">Calculadora de Importación</h1>
-  <p class="text-slate-400 text-sm mb-6">Calculá el costo real de traer productos a Uruguay</p>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="card">
-      <h3 class="font-semibold mb-4">Datos del Producto</h3>
-      <div class="space-y-4">
-        <div><label class="block text-xs text-slate-400 mb-1">Precio del producto (USD)</label><input type="number" id="c-cost" value="5" step="0.01" class="w-full"></div>
-        <div><label class="block text-xs text-slate-400 mb-1">Costo de envío por unidad (USD)</label><input type="number" id="c-ship" value="3" step="0.01" class="w-full"></div>
-        <div><label class="block text-xs text-slate-400 mb-1">Cantidad</label><input type="number" id="c-qty" value="10" class="w-full"></div>
-        <div><label class="block text-xs text-slate-400 mb-1">Categoría (afecta arancel)</label>
-          <select id="c-cat" class="w-full">
-            <option value="tecnologia">Tecnología (2% arancel)</option>
-            <option value="accesorios">Accesorios Móvil (10% arancel)</option>
-            <option value="hogar">Hogar (10% arancel)</option>
-            <option value="belleza">Belleza (14% arancel)</option>
-            <option value="fitness">Fitness (14% arancel)</option>
-            <option value="mascotas">Mascotas (14% arancel)</option>
-            <option value="auto">Acc. Auto (14% arancel)</option>
-            <option value="default" selected>General (14% arancel)</option>
-          </select>
-        </div>
-        <button class="btn btn-primary w-full justify-center" onclick="runCalc()">🧮 Calcular Costo Total</button>
-      </div>
-    </div>
-    <div class="card" id="c-result">
-      <h3 class="font-semibold mb-4">Resultado</h3>
-      <div class="text-center py-8 text-slate-500">Ingresá los datos y calculá</div>
-    </div>
-  </div>
-</div>
-
-<!-- ML URUGUAY -->
-<div class="tab" id="tab-ml">
-  <h1 class="text-2xl font-bold mb-1">MercadoLibre Uruguay</h1>
-  <p class="text-slate-400 text-sm mb-6">Compará precios locales para calcular tu margen</p>
-  <div class="card mb-6">
-    <div class="flex gap-3 items-end flex-wrap">
-      <div class="flex-1 min-w-[200px]">
-        <label class="block text-xs text-slate-400 mb-1">Buscar en ML Uruguay</label>
-        <input type="text" id="ml-kw" class="w-full" placeholder="Ej: auriculares bluetooth">
-      </div>
-      <button class="btn btn-primary" onclick="runML()" id="ml-btn">🔍 Buscar en ML</button>
-      <a id="ml-direct" href="#" target="_blank" class="btn text-slate-400 hover:text-white" style="background:rgba(30,41,59,.5)">Abrir ML ↗</a>
-    </div>
-  </div>
-  <div id="ml-status" class="mb-4"></div>
-  <div id="ml-results" class="space-y-3"></div>
-</div>
-
-<!-- NICHES -->
-<div class="tab" id="tab-niches">
-  <h1 class="text-2xl font-bold mb-1">Tendencias</h1>
-  <p class="text-slate-400 text-sm mb-6">Nichos con alta demanda para importar</p>
-  <div id="niches-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-</div>
-
-</div>
-</main>
-</div>
+<body>
+<div id="app"><aside class="sidebar"><div class="sidebar-logo"><span>UY</span>Hunter</div><nav class="sidebar-nav" id="nav"></nav><div class="sidebar-footer" id="api-foot">Conectando...</div></aside><main class="main" id="main-content"></main></div>
 
 <script>
-const API = '/api';
-let catChart = null, priceChart = null;
+var API='/api';
+var NAV=[{id:'dashboard',icon:'📊',label:'Dashboard'},{id:'hunter',icon:'🤖',label:'Product Hunter'},{id:'products',icon:'📦',label:'Productos'},{id:'calculator',icon:'🧮',label:'Calculadora'},{id:'ml',icon:'🔍',label:'ML Uruguay'},{id:'niches',icon:'🔥',label:'Tendencias'}];
+var catChart=null,priceChart=null;
 
-// ════ TOAST ════
-function toast(msg, type='success') {
-  const t = document.createElement('div');
-  t.className = 'toast toast-'+type; t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
-}
-
-// ════ TABS ════
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  const tab = document.getElementById('tab-'+name);
-  const nav = document.getElementById('nav-'+name);
-  if(tab) tab.classList.add('active');
-  if(nav) nav.classList.add('active');
-  if(name === 'dashboard') loadDashboard();
-  if(name === 'products') loadProducts();
-  if(name === 'niches') loadNiches();
-}
-
-// ════ DASHBOARD ════
-async function loadDashboard() {
-  try {
-    const r = await fetch(API+'/stats'); const d = await r.json();
-    document.getElementById('d-total').textContent = d.total_products||0;
-    document.getElementById('d-avg').textContent = '$'+(d.avg_price_usd||0).toFixed(2);
-    document.getElementById('d-recent').textContent = d.recent_7d||0;
-    document.getElementById('d-sources').textContent = Object.keys(d.by_source||{}).length;
-    renderCatChart(d.by_category||{});
-    renderPriceChart(d.by_category||{});
-  }catch(e){console.error(e)}
-}
-
-function renderCatChart(data) {
-  const ctx = document.getElementById('catChart');
-  if(catChart) catChart.destroy();
-  const labels = Object.keys(data);
-  const values = Object.values(data);
-  if(!labels.length){labels.push('Sin datos');values.push(1)}
-  catChart = new Chart(ctx,{
-    type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:['#0ea5e9','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'],borderWidth:2,borderColor:'#0f172a'}]},
-    options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',padding:12,font:{size:11}}}}}
+(function init(){
+  var nav=document.getElementById('nav');
+  NAV.forEach(function(n){
+    var el=document.createElement('div');
+    el.className='nav-item'+(n.id==='dashboard'?' active':'');
+    el.id='nav-'+n.id;
+    el.innerHTML='<span class="nav-icon">'+n.icon+'</span>'+n.label;
+    el.onclick=function(){switchPage(n.id)};
+    nav.appendChild(el);
   });
-}
-
-function renderPriceChart(data) {
-  const ctx = document.getElementById('priceChart');
-  if(priceChart) priceChart.destroy();
-  priceChart = new Chart(ctx,{
-    type:'bar',data:{labels:Object.keys(data).length?Object.keys(data):['Sin datos'],datasets:[{label:'Productos',data:Object.values(data).length?Object.values(data):[0],backgroundColor:'#0ea5e9',borderRadius:6}]},
-    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(148,163,184,.06)'},ticks:{color:'#94a3b8'}},x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:10}}}}}
+  var main=document.getElementById('main-content');
+  NAV.forEach(function(n){
+    var page=document.createElement('div');
+    page.className='page'+(n.id==='dashboard'?' active':'');
+    page.id='page-'+n.id;
+    page.innerHTML='<div class="loading-state"><div class="spinner"></div>Cargando...</div>';
+    main.appendChild(page);
   });
+  loadDashboard();
+  fetch(API+'/health').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('api-foot').textContent='API online '+d.total_products+' prod';
+  }).catch(function(){document.getElementById('api-foot').textContent='API offline'});
+})();
+
+function switchPage(id){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  if(id==='dashboard') loadDashboard();
+  if(id==='products') loadProducts();
+  if(id==='niches') loadNiches();
 }
 
-// ════ HUNTER ════
-async function runHunter() {
-  const btn = document.getElementById('h-btn'), status = document.getElementById('h-status'),
-    results = document.getElementById('h-results'), empty = document.getElementById('h-empty');
-  btn.disabled = true; btn.textContent = '⏳ Buscando...';
-  status.innerHTML = '<div style="display:flex;align-items:center;gap:.5rem"><div class="spinner"></div> Buscando productos en Banggood...</div>';
-  results.innerHTML = ''; empty.style.display = 'none';
-  try {
-    const body = {keywords: document.getElementById('h-kw').value, max_products: parseInt(document.getElementById('h-limit').value)};
-    const min = parseFloat(document.getElementById('h-min').value), max = parseFloat(document.getElementById('h-max').value);
-    if(min>0) body.min_price = min;
-    if(max>0) body.max_price = max;
-    const r = await fetch(API+'/hunter/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d = await r.json();
-    if(!d.success){status.innerHTML='<span style="color:#ef4444">❌ '+(d.error||'Error')+'</span>';return}
-    status.innerHTML = '<span style="color:#22c55e">✅ '+d.added+' productos encontrados en Banggood</span>';
-    if(!d.products.length){empty.style.display='block';return}
-    d.products.forEach(p => {
-      const margin = p.price_usd > 0 ? Math.round((1 - p.price_usd / (p.price_usd * 3)) * 100) : '?';
-      results.innerHTML += `<div class="result-card card flex gap-4">
-        <div class="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden" style="background:rgba(15,23,42,.8)">
-          ${p.image_url ? '<img src="'+p.image_url+'" alt="" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML=\'<div class=\\'w-full h-full flex items-center justify-center text-2xl\\'>📦</div>\'">' : '<div class="w-full h-full flex items-center justify-center text-2xl">📦</div>'}
-        </div>
-        <div class="flex-1 min-w-0">
-          <a href="${p.url}" target="_blank" class="font-semibold text-sm hover:text-brand-400 transition line-clamp-2">${p.title}</a>
-          <div class="flex items-center gap-2 mt-1.5">
-            <span class="px-2 py-0.5 text-xs rounded-full font-medium" style="background:rgba(14,165,233,.15);color:#38bdf8">${p.source}</span>
-            <span class="px-2 py-0.5 text-xs rounded-full font-medium" style="background:rgba(139,92,246,.15);color:#a78bfa">${p.category||'general'}</span>
-          </div>
-          <div class="text-xs text-slate-500 mt-1">ID: ${p.product_id}</div>
-        </div>
-        <div class="text-right flex-shrink-0">
-          <div class="text-xl font-bold text-accent-400">$${p.price_usd.toFixed(2)}</div>
-          <div class="text-xs text-slate-500">mayorista</div>
-          <button class="btn mt-2" style="background:rgba(30,41,59,.8);font-size:.75rem" onclick="quickCalc(${p.price_usd},'${p.category||'default'}')">🧮 Calcular</button>
-        </div>
-      </div>`;
-    });
-  }catch(e){status.innerHTML='<span style="color:#ef4444">❌ Error: '+e.message+'</span>'}
-  btn.disabled = false; btn.textContent = '🔍 Buscar';
+function toast(msg,ok){var t=document.createElement('div');t.className='toast '+(ok?'toast-ok':'toast-err');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},3000)}
+
+function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function imgOrPlaceholder(url){return url?'<img src="'+escHtml(url)+'" alt="" onerror="this.style.display=\\\'none\\\'">':''}
+
+// ═════════ DASHBOARD ═════════
+async function loadDashboard(){
+  var page=document.getElementById('page-dashboard');
+  try{
+    var r=await fetch(API+'/stats');var d=await r.json();
+    page.innerHTML='<h1>Dashboard</h1><p class="subtitle">Resumen de tu operacion de importacion</p>'+
+      '<div class="stats-grid">'+
+        '<div class="stat-card"><div class="stat-label">Productos</div><div class="stat-value">'+(d.total_products||0)+'</div></div>'+
+        '<div class="stat-card"><div class="stat-label">Precio promedio</div><div class="stat-value accent">$'+(d.avg_price_usd||0).toFixed(2)+'</div></div>'+
+        '<div class="stat-card"><div class="stat-label">Ultimos 7 dias</div><div class="stat-value green">'+(d.recent_7d||0)+'</div></div>'+
+        '<div class="stat-card"><div class="stat-label">Fuentes</div><div class="stat-value amber">'+Object.keys(d.by_source||{}).length+'</div></div>'+
+      '</div>'+
+      '<div class="grid-2">'+
+        '<div class="card"><h3>Productos por Categoria</h3><div class="chart-wrap"><canvas id="catChart"></canvas></div></div>'+
+        '<div class="card"><h3>Distribucion de Precios</h3><div class="chart-wrap"><canvas id="priceChart"></canvas></div></div>'+
+      '</div>';
+    setTimeout(function(){renderCharts(d.by_category||{})},200);
+  }catch(e){page.innerHTML='<h1>Dashboard</h1><p class="subtitle">Error al cargar</p>'}
 }
 
-// ════ PRODUCTS ════
-async function loadProducts() {
-  const list = document.getElementById('p-list');
-  list.innerHTML = '<div style="display:flex;align-items:center;gap:.5rem;padding:2rem"><div class="spinner"></div> Cargando...</div>';
-  try {
-    const r = await fetch(API+'/products?limit=50'); const prods = await r.json();
-    if(!prods.length){list.innerHTML='<div class="card text-center py-12 text-slate-500"><div class="text-4xl mb-3">📦</div>No hay productos todavía. Usá el Hunter para buscar.</div>';return}
-    list.innerHTML = prods.map(p => `<div class="card flex gap-4 items-start">
-      <div class="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden" style="background:rgba(15,23,42,.8)">
-        ${p.image_url ? '<img src="'+p.image_url+'" alt="" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML=\'<div class=\\'w-full h-full flex items-center justify-center\\'>📦</div>\'">' : '<div class="w-full h-full flex items-center justify-center">📦</div>'}
-      </div>
-      <div class="flex-1 min-w-0">
-        <div class="font-semibold text-sm">${p.name||'Sin nombre'}</div>
-        <div class="flex gap-2 mt-1">
-          <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(14,165,233,.15);color:#38bdf8">${p.source||'?'}</span>
-          <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(139,92,246,.15);color:#a78bfa">${p.category||'general'}</span>
-          <span class="text-xs text-slate-500">${p.created_at||''}</span>
-        </div>
-      </div>
-      <div class="text-right"><div class="text-lg font-bold text-accent-400">$${(p.product_cost_usd||0).toFixed(2)}</div></div>
-    </div>`).join('');
-  }catch(e){list.innerHTML='<span style="color:#ef4444">Error: '+e.message+'</span>'}
+function renderCharts(data){
+  var labels=Object.keys(data),values=Object.values(data),colors=['#5e6ad2','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+  if(!labels.length){labels=['Sin datos'];values=[1]}
+  var ctx1=document.getElementById('catChart');
+  if(ctx1){
+    if(catChart) catChart.destroy();
+    catChart=new Chart(ctx1,{type:'doughnut',data:{labels:labels,datasets:[{data:values,backgroundColor:colors,borderWidth:2,borderColor:'#191a1b'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8a8f98',padding:12,font:{size:11},usePointStyle:true}}}}});
+  }
+  var ctx2=document.getElementById('priceChart');
+  if(ctx2){
+    if(priceChart) priceChart.destroy();
+    priceChart=new Chart(ctx2,{type:'bar',data:{labels:labels,datasets:[{label:'Productos',data:values,backgroundColor:'#5e6ad2',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8a8f98'}},x:{grid:{display:false},ticks:{color:'#8a8f98'}}}}});
+  }
 }
 
-// ════ CALCULATOR ════
-function quickCalc(cost, cat) {
-  document.getElementById('c-cost').value = cost;
-  document.getElementById('c-cat').value = cat || 'default';
-  switchTab('calculator');
-  runCalc();
+// ═════════ HUNTER ═════════
+(function buildHunter(){
+  document.getElementById('page-hunter').innerHTML='<h1>Product Hunter</h1><p class="subtitle">Encontra productos en Banggood para importar a Uruguay</p>'+
+    '<div class="card mb-4"><div class="hunter-form">'+
+      '<div class="field" style="flex:1;min-width:200px"><label>Que producto buscas?</label><input type="text" id="h-kw" value="auriculares bluetooth" placeholder="Ej: smartwatch, lampara led..."></div>'+
+      '<div class="field"><label>Precio min $</label><input type="number" id="h-min" value="0" step="0.01" style="width:100px"></div>'+
+      '<div class="field"><label>Precio max $</label><input type="number" id="h-max" placeholder="inf" step="0.01" style="width:100px"></div>'+
+      '<div class="field"><label>Cantidad</label><select id="h-limit"><option>5</option><option selected>10</option><option>20</option><option>30</option></select></div>'+
+      '<div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="h-btn" onclick="runHunter()">Buscar</button></div>'+
+    '</div></div>'+
+    '<div id="h-status" class="mb-4"></div><div id="h-results"></div>';
+})();
+
+async function runHunter(){
+  var btn=document.getElementById('h-btn'),status=document.getElementById('h-status'),results=document.getElementById('h-results');
+  btn.disabled=true;btn.textContent='Buscando...';
+  status.innerHTML='<div class="loading-state"><div class="spinner"></div>Buscando productos en Banggood...</div>';
+  results.innerHTML='';
+  try{
+    var body={keywords:document.getElementById('h-kw').value,max_products:parseInt(document.getElementById('h-limit').value)};
+    var min=parseFloat(document.getElementById('h-min').value),max=parseFloat(document.getElementById('h-max').value);
+    if(min>0) body.min_price=min; if(max>0) body.max_price=max;
+    var r=await fetch(API+'/hunter/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d=await r.json();
+    if(!d.success){status.innerHTML='<span class="status-err">Error: '+(d.error||'desconocido')+'</span>';btn.disabled=false;btn.textContent='Buscar';return}
+    status.innerHTML='<span class="status-ok">'+d.added+' productos encontrados en Banggood</span>';
+    if(!d.products.length){results.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div>No se encontraron productos. Proba con otras keywords.</div>';btn.disabled=false;btn.textContent='Buscar';return}
+    results.innerHTML=d.products.map(function(p){
+      return '<div class="product-card">'+
+        '<div class="product-img">'+(p.image_url?'<img src="'+escHtml(p.image_url)+'" alt="" onerror="this.style.display=\\\'none\\\'">':'')+'</div>'+
+        '<div class="product-info">'+
+          '<div class="product-title"><a href="'+escHtml(p.url)+'" target="_blank">'+escHtml(p.title)+'</a></div>'+
+          '<div class="product-meta"><span class="badge badge-source">'+p.source+'</span><span class="badge badge-cat">'+(p.category||'general')+'</span></div>'+
+          '<div class="product-id">ID: '+p.product_id+'</div>'+
+        '</div>'+
+        '<div class="product-price"><div class="price-value">$'+p.price_usd.toFixed(2)+'</div><div class="price-label">mayorista</div>'+
+        '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="quickCalc('+p.price_usd+',\''+(p.category||'default')+'\')">Calcular costo</button></div>'+
+      '</div>';
+    }).join('');
+  }catch(e){status.innerHTML='<span class="status-err">Error: '+e.message+'</span>'}
+  btn.disabled=false;btn.textContent='Buscar';
 }
 
-async function runCalc() {
-  const res = document.getElementById('c-result');
-  res.innerHTML = '<div style="display:flex;align-items:center;gap:.5rem;padding:1rem"><div class="spinner"></div> Calculando...</div>';
-  try {
-    const body = {
-      product_cost: parseFloat(document.getElementById('c-cost').value),
-      shipping: parseFloat(document.getElementById('c-ship').value),
-      quantity: parseInt(document.getElementById('c-qty').value),
-      category: document.getElementById('c-cat').value
-    };
-    const r = await fetch(API+'/calculate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d = await r.json();
-    res.innerHTML = `<div class="space-y-3">
-      <div class="grid grid-cols-2 gap-3 text-sm">
-        <div class="p-3 rounded-lg" style="background:rgba(15,23,42,.6)"><div class="text-slate-400 text-xs">Costo producto</div><div class="font-semibold">$${d.cost_usd}</div></div>
-        <div class="p-3 rounded-lg" style="background:rgba(15,23,42,.6)"><div class="text-slate-400 text-xs">Envío</div><div class="font-semibold">$${d.shipping_usd}</div></div>
-        <div class="p-3 rounded-lg" style="background:rgba(15,23,42,.6)"><div class="text-slate-400 text-xs">Arancel (${d.tariff_rate})</div><div class="font-semibold">$${d.tariff_usd}</div></div>
-        <div class="p-3 rounded-lg" style="background:rgba(15,23,42,.6)"><div class="text-slate-400 text-xs">IVA (${d.iva_rate})</div><div class="font-semibold">$${d.iva_usd}</div></div>
-      </div>
-      <div class="p-4 rounded-xl" style="background:rgba(2,132,199,.1);border:1px solid rgba(2,132,199,.2)">
-        <div class="flex justify-between items-baseline">
-          <div><div class="text-xs text-slate-400">Costo total</div><div class="text-2xl font-extrabold text-white">$${d.total_usd}</div></div>
-          <div class="text-right"><div class="text-xs text-slate-400">Por unidad</div><div class="text-xl font-bold text-brand-400">$${d.cost_per_unit}</div></div>
-        </div>
-      </div>
-      <div class="p-4 rounded-xl" style="background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.2)">
-        <div class="flex justify-between items-baseline">
-          <div><div class="text-xs text-slate-400">En pesos uruguayos</div><div class="text-2xl font-extrabold text-accent-400">$U ${d.total_uyu.toLocaleString()}</div></div>
-          <div class="text-right"><div class="text-xs text-slate-400">Por unidad</div><div class="text-xl font-bold text-accent-400">$U ${d.cpu_uyu.toLocaleString()}</div></div>
-        </div>
-      </div>
-    </div>`;
-  }catch(e){res.innerHTML='<span style="color:#ef4444">Error: '+e.message+'</span>'}
+// ═════════ PRODUCTS ═════════
+async function loadProducts(){
+  var page=document.getElementById('page-products');
+  page.innerHTML='<h1>Productos</h1><p class="subtitle">Pipeline de productos encontrados</p><div class="loading-state"><div class="spinner"></div>Cargando...</div>';
+  try{
+    var r=await fetch(API+'/products?limit=50');var prods=await r.json();
+    if(!prods.length){page.innerHTML='<h1>Productos</h1><p class="subtitle">Pipeline de productos encontrados</p><div class="empty-state"><div class="empty-icon">📦</div>No hay productos todavia. Usa el Hunter para buscar.</div>';return}
+    page.innerHTML='<h1>Productos</h1><p class="subtitle">Pipeline de productos encontrados</p>'+prods.map(function(p){
+      return '<div class="product-card">'+
+        '<div class="product-img">'+(p.image_url?'<img src="'+escHtml(p.image_url)+'" alt="" onerror="this.style.display=\\\'none\\\'">':'')+'</div>'+
+        '<div class="product-info">'+
+          '<div class="product-title">'+escHtml(p.name||'Sin nombre')+'</div>'+
+          '<div class="product-meta"><span class="badge badge-source">'+(p.source||'?')+'</span><span class="badge badge-cat">'+(p.category||'general')+'</span><span style="font-size:11px;color:var(--text-quaternary)">'+(p.created_at||'')+'</span></div>'+
+        '</div>'+
+        '<div class="product-price"><div class="price-value">$'+(p.product_cost_usd||0).toFixed(2)+'</div></div>'+
+      '</div>';
+    }).join('');
+  }catch(e){page.innerHTML='<h1>Productos</h1><p class="subtitle">Error: '+e.message+'</div>'}
 }
 
-// ════ ML ════
-async function runML() {
-  const kw = document.getElementById('ml-kw').value;
-  if(!kw) return toast('Ingresá un término de búsqueda','error');
-  document.getElementById('ml-direct').href = 'https://listado.mercadolibre.com.uy/'+encodeURIComponent(kw);
-  const status = document.getElementById('ml-status'), results = document.getElementById('ml-results');
-  status.innerHTML = '<div style="display:flex;align-items:center;gap:.5rem"><div class="spinner"></div> Buscando en MercadoLibre Uruguay...</div>';
-  results.innerHTML = '';
-  try {
-    const r = await fetch(API+'/ml-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keywords:kw})});
-    const d = await r.json();
-    if(!d.success){status.innerHTML='<span style="color:#f59e0b">⚠ '+d.message+' <a href="'+d.ml_url+'" target="_blank" style="color:#38bdf8">Abrir ML ↗</a></span>';return}
-    status.innerHTML = '<span style="color:#22c55e">✅ '+d.products.length+' resultados (aproximados)</span>';
-    if(!d.products.length){results.innerHTML='<div class="card text-center py-8 text-slate-500">No se encontraron resultados automáticos. <a href="https://listado.mercadolibre.com.uy/'+encodeURIComponent(kw)+'" target="_blank" class="text-brand-400">Buscá directamente en ML ↗</a></div>';return}
-    results.innerHTML = d.products.map(p => `<div class="card flex justify-between items-center">
-      <div class="flex-1"><div class="font-medium text-sm">${p.title}</div></div>
-      <div class="text-lg font-bold text-warning">${p.price_uyu ? '$U '+p.price_uyu : '?'}</div>
-    </div>`).join('');
-  }catch(e){status.innerHTML='<span style="color:#ef4444">Error: '+e.message+'</span>'}
+// ═════════ CALCULATOR ═════════
+function quickCalc(cost,cat){switchPage('calculator');setTimeout(function(){document.getElementById('c-cost').value=cost;document.getElementById('c-cat').value=cat||'default';runCalc()},200)}
+(function buildCalc(){
+  document.getElementById('page-calculator').innerHTML='<h1>Calculadora de Importacion</h1><p class="subtitle">Calcula el costo real de traer productos a Uruguay</p>'+
+    '<div class="grid-2">'+
+      '<div class="card"><h3>Datos del Producto</h3><div style="display:flex;flex-direction:column;gap:12px">'+
+        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Precio del producto (USD)</label><input type="number" id="c-cost" value="5" step="0.01" style="width:100%"></div>'+
+        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Costo de envio por unidad (USD)</label><input type="number" id="c-ship" value="3" step="0.01" style="width:100%"></div>'+
+        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Cantidad</label><input type="number" id="c-qty" value="10" style="width:100%"></div>'+
+        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Categoria (afecta arancel)</label>'+
+          '<select id="c-cat" style="width:100%"><option value="tecnologia">Tecnologia (2% arancel)</option><option value="accesorios">Accesorios Movil (10%)</option><option value="hogar">Hogar (10%)</option><option value="belleza">Belleza (14%)</option><option value="fitness">Fitness (14%)</option><option value="mascotas">Mascotas (14%)</option><option value="auto">Acc. Auto (14%)</option><option value="default" selected>General (14%)</option></select></div>'+
+        '<button class="btn btn-primary" style="justify-content:center" onclick="runCalc()">Calcular Costo Total</button>'+
+      '</div></div>'+
+      '<div class="card" id="c-result"><h3>Resultado</h3><div class="empty-state">Ingresa los datos y calcula</div></div>'+
+    '</div>';
+})();
+async function runCalc(){
+  var res=document.getElementById('c-result');
+  res.innerHTML='<h3>Resultado</h3><div class="loading-state"><div class="spinner"></div>Calculando...</div>';
+  try{
+    var body={product_cost:parseFloat(document.getElementById('c-cost').value),shipping:parseFloat(document.getElementById('c-ship').value),quantity:parseInt(document.getElementById('c-qty').value),category:document.getElementById('c-cat').value};
+    var r=await fetch(API+'/calculate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d=await r.json();
+    res.innerHTML='<h3>Resultado</h3>'+
+      '<div class="calc-grid">'+
+        '<div class="calc-item"><div class="label">Costo producto</div><div class="value">$'+d.cost_usd+'</div></div>'+
+        '<div class="calc-item"><div class="label">Envio</div><div class="value">$'+d.shipping_usd+'</div></div>'+
+        '<div class="calc-item"><div class="label">Arancel ('+d.tariff_rate+')</div><div class="value">$'+d.tariff_usd+'</div></div>'+
+        '<div class="calc-item"><div class="label">IVA ('+d.iva_rate+')</div><div class="value">$'+d.iva_usd+'</div></div>'+
+      '</div>'+
+      '<div class="calc-total primary"><div class="total-label">Costo total en USD</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="total-value">$'+d.total_usd+'</div><div class="total-sub">$'+d.cost_per_unit+' / unidad</div></div></div>'+
+      '<div class="calc-total green-bg"><div class="total-label">En pesos uruguayos (USD 1 = $U 43)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="total-value">$U '+d.total_uyu.toLocaleString()+'</div><div class="total-sub">$U '+d.cpu_uyu.toLocaleString()+' / unidad</div></div></div>';
+  }catch(e){res.innerHTML='<h3>Resultado</h3><span class="status-err">Error: '+e.message+'</span>'}
 }
 
-// ════ NICHES ════
-async function loadNiches() {
-  const grid = document.getElementById('niches-grid');
-  try {
-    const r = await fetch(API+'/hunter/niches'); const d = await r.json();
-    grid.innerHTML = d.niches.map(n => `<div class="card">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold">${n.name}</h3>
-        <span class="text-xs px-2 py-1 rounded-full font-medium" style="background:${n.demand==='alta'?'rgba(34,197,94,.15)':'rgba(245,158,11,.15)'};color:${n.demand==='alta'?'#4ade80':'#f59e0b'}">${n.demand==='alta'?'🔥 Alta demanda':'📊 Demanda media'}</span>
-      </div>
-      <div class="text-xs text-accent-400 mb-3 font-medium">Margen potencial: ${n.margin==='alto'?'Alto':'Medio'}</div>
-      <div class="flex flex-wrap gap-1.5">
-        ${n.subcategories.map(s => '<span class="text-xs px-2 py-1 rounded-lg cursor-pointer hover:bg-brand-600/20 transition" style="background:rgba(30,41,59,.8);color:#94a3b8" onclick="searchNiche(\''+s+'\')">'+s+'</span>').join('')}
-      </div>
-    </div>`).join('');
-  }catch(e){grid.innerHTML='Error: '+e.message}
+// ═════════ ML ═════════
+(function buildML(){
+  document.getElementById('page-ml').innerHTML='<h1>MercadoLibre Uruguay</h1><p class="subtitle">Compara precios locales para calcular tu margen</p>'+
+    '<div class="card mb-4"><div class="hunter-form">'+
+      '<div class="field" style="flex:1;min-width:200px"><label>Buscar en ML Uruguay</label><input type="text" id="ml-kw" placeholder="Ej: auriculares bluetooth"></div>'+
+      '<div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="runML()">Buscar en ML</button></div>'+
+      '<div class="field"><label>&nbsp;</label><a id="ml-direct" href="#" target="_blank" class="btn btn-ghost">Abrir ML</a></div>'+
+    '</div></div><div id="ml-status" class="mb-4"></div><div id="ml-results"></div>';
+})();
+async function runML(){
+  var kw=document.getElementById('ml-kw').value;if(!kw){toast('Ingresa un termino',false);return}
+  document.getElementById('ml-direct').href='https://listado.mercadolibre.com.uy/'+encodeURIComponent(kw);
+  var status=document.getElementById('ml-status'),results=document.getElementById('ml-results');
+  status.innerHTML='<div class="loading-state"><div class="spinner"></div>Buscando en ML Uruguay...</div>';results.innerHTML='';
+  try{
+    var r=await fetch(API+'/ml-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keywords:kw})});
+    var d=await r.json();
+    if(!d.success){status.innerHTML='<span class="status-err">ML requiere navegador. <a href="'+d.ml_url+'" target="_blank" style="color:var(--accent)">Busca directamente en ML</a></span>';return}
+    status.innerHTML='<span class="status-ok">'+d.products.length+' resultados aproximados</span>';
+    if(!d.products.length){results.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div>No se encontraron resultados. Busca directamente en ML.</div>';return}
+    results.innerHTML=d.products.map(function(p){return '<div class="ml-card"><div class="ml-title">'+escHtml(p.title)+'</div><div class="ml-price">'+(p.price_uyu?'$U '+p.price_uyu:'?')+'</div></div>'}).join('');
+  }catch(e){status.innerHTML='<span class="status-err">Error: '+e.message+'</span>'}
 }
 
-function searchNiche(kw) {
-  document.getElementById('h-kw').value = kw;
-  switchTab('hunter');
-  runHunter();
+// ═════════ NICHES ═════════
+async function loadNiches(){
+  var page=document.getElementById('page-niches');
+  page.innerHTML='<h1>Tendencias</h1><p class="subtitle">Nichos con alta demanda para importar</p><div class="loading-state"><div class="spinner"></div>Cargando...</div>';
+  try{
+    var r=await fetch(API+'/hunter/niches');var d=await r.json();
+    page.innerHTML='<h1>Tendencias</h1><p class="subtitle">Nichos con alta demanda para importar</p><div class="grid-2">'+d.niches.map(function(n){
+      return '<div class="niche-card">'+
+        '<div class="niche-header"><div class="niche-name">'+n.name+'</div><span class="niche-badge '+(n.demand==='alta'?'high':'medium')+'">'+(n.demand==='alta'?'Alta demanda':'Demanda media')+'</span></div>'+
+        '<div style="font-size:12px;color:var(--green);margin-bottom:12px;font-weight:500">Margen potencial: '+(n.margin==='alto'?'Alto':'Medio')+'</div>'+
+        '<div class="niche-tags">'+n.subcategories.map(function(s){return '<span class="niche-tag" onclick="searchNiche(\''+s+'\')">'+s+'</span>'}).join('')+'</div>'+
+      '</div>';
+    }).join('')+'</div>';
+  }catch(e){page.innerHTML='<h1>Tendencias</h1><p class="subtitle">Error: '+e.message+'</div>'}
 }
-
-// ════ INIT ════
-loadDashboard();
-fetch(API+'/health').then(r=>r.json()).then(d=>{
-  document.getElementById('api-status').textContent = '✅ API online · '+d.total_products+' productos';
-}).catch(()=>{
-  document.getElementById('api-status').textContent = '⚠ API offline';
-});
+function searchNiche(kw){switchPage('hunter');setTimeout(function(){document.getElementById('h-kw').value=kw;runHunter()},300)}
 </script>
 </body>
 </html>
