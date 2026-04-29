@@ -2,337 +2,356 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>UYHunter — Product Sourcing</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>UYHunter — Import Product Sourcing</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 :root{
-  --bg-deep:#08090a;--bg-panel:#0f1011;--bg-surface:#191a1b;--bg-elevated:#222325;
-  --text-primary:#f7f8f8;--text-secondary:#d0d6e0;--text-tertiary:#8a8f98;--text-quaternary:#62666d;
-  --brand:#5e6ad2;--brand-hover:#828fff;--accent:#7170ff;
-  --border-subtle:rgba(255,255,255,.05);--border-std:rgba(255,255,255,.08);
-  --green:#10b981;--red:#ef4444;--amber:#f59e0b;
-  --radius-sm:4px;--radius:6px;--radius-md:8px;--radius-lg:12px;--radius-xl:16px;--radius-full:9999px;
+--bg:#0a0a0c;--bg2:#111114;--bg3:#18181c;--bg4:#1f1f24;
+--t1:#fafafa;--t2:#a1a1aa;--t3:#71717a;--t4:#52525b;
+--brand:#6366f1;--brand2:#818cf8;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;
+--b:rgba(255,255,255,.06);--b2:rgba(255,255,255,.1);
+--r:6px;--r2:10px;--r3:14px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-deep);color:var(--text-secondary);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-#app{display:flex;height:100vh;overflow:hidden}
-.sidebar{width:240px;flex-shrink:0;background:var(--bg-panel);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;padding:12px}
-.sidebar-logo{padding:12px 8px 20px;font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--text-primary)}
-.sidebar-logo span{color:var(--accent)}
-.sidebar-nav{flex:1;display:flex;flex-direction:column;gap:2px}
-.nav-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--radius);font-size:13px;font-weight:500;color:var(--text-tertiary);cursor:pointer;transition:all .15s;user-select:none}
-.nav-item:hover{background:rgba(255,255,255,.03);color:var(--text-secondary)}
-.nav-item.active{background:rgba(94,106,210,.12);color:var(--accent);font-weight:600}
-.nav-icon{font-size:15px;width:22px;text-align:center;flex-shrink:0}
-.sidebar-footer{padding:12px 8px;border-top:1px solid var(--border-subtle);font-size:11px;color:var(--text-quaternary);font-weight:500}
-.main{flex:1;overflow:auto;padding:32px}
-.page{display:none;animation:fadeIn .25s ease}
-.page.active{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-h1{font-size:24px;font-weight:600;color:var(--text-primary);letter-spacing:-.3px;margin-bottom:4px}
-h2{font-size:18px;font-weight:600;color:var(--text-primary);letter-spacing:-.2px;margin-bottom:12px}
-h3{font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:8px}
-.subtitle{font-size:14px;color:var(--text-tertiary);margin-bottom:24px}
-.card{background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-md);padding:20px;transition:all .2s}
-.card:hover{border-color:rgba(255,255,255,.12)}
-.stat-card{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:20px;transition:all .2s}
-.stat-card:hover{border-color:var(--border-std);transform:translateY(-1px)}
-.stat-label{font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.stat-value{font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.5px;line-height:1.1}
-.stat-value.accent{color:var(--accent)}.stat-value.green{color:var(--green)}.stat-value.amber{color:var(--amber)}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:none;outline:none;white-space:nowrap}
-.btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{background:var(--brand-hover)}
-.btn-ghost{background:rgba(255,255,255,.02);color:var(--text-secondary);border:1px solid var(--border-std)}.btn-ghost:hover{background:rgba(255,255,255,.05);color:var(--text-primary)}
-.btn-sm{padding:4px 10px;font-size:12px}
-input,select{font-family:inherit;font-size:13px;padding:8px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border-std);border-radius:var(--radius);color:var(--text-primary);outline:none;transition:border .15s}
-input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,106,210,.1)}
-input::placeholder{color:var(--text-quaternary)}
-select{appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238a8f98'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.flex-between{display:flex;align-items:center;justify-content:space-between}
-.gap-2{gap:8px}.gap-3{gap:12px}.mb-4{margin-bottom:16px}.mb-6{margin-bottom:24px}
-.product-card{display:flex;gap:16px;padding:16px;background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-lg);transition:all .15s;animation:slideUp .3s ease backwards}
-.product-card:hover{border-color:rgba(255,255,255,.12)}
-.product-card:nth-child(1){animation-delay:0s}.product-card:nth-child(2){animation-delay:.04s}.product-card:nth-child(3){animation-delay:.08s}.product-card:nth-child(4){animation-delay:.12s}.product-card:nth-child(5){animation-delay:.16s}.product-card:nth-child(6){animation-delay:.2s}.product-card:nth-child(7){animation-delay:.24s}.product-card:nth-child(8){animation-delay:.28s}.product-card:nth-child(9){animation-delay:.32s}.product-card:nth-child(10){animation-delay:.36s}
-@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.product-img{width:80px;height:80px;flex-shrink:0;border-radius:var(--radius);background:var(--bg-panel);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:28px}
-.product-img img{width:100%;height:100%;object-fit:cover}
-.product-info{flex:1;min-width:0}
-.product-title{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.product-title a{color:inherit;text-decoration:none}.product-title a:hover{color:var(--accent)}
-.product-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
-.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:var(--radius-full);font-size:11px;font-weight:500}
-.badge-source{background:rgba(94,106,210,.12);color:var(--accent)}
-.badge-cat{background:rgba(255,255,255,.04);color:var(--text-tertiary)}
-.product-id{font-size:11px;color:var(--text-quaternary);font-family:'JetBrains Mono',monospace}
-.product-price{text-align:right;flex-shrink:0}
-.price-value{font-size:20px;font-weight:700;color:var(--text-primary);letter-spacing:-.3px}
-.price-label{font-size:11px;color:var(--text-quaternary)}
-.hunter-form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
-.hunter-form .field{display:flex;flex-direction:column;gap:4px}
-.hunter-form label{font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;letter-spacing:.3px}
-.status-ok{color:var(--green);font-size:14px;font-weight:500}
-.status-err{color:var(--red);font-size:14px;font-weight:500}
-.calc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
-.calc-item{padding:12px;background:var(--bg-panel);border-radius:var(--radius);text-align:center}
-.calc-item .label{font-size:11px;color:var(--text-quaternary);margin-bottom:4px}
-.calc-item .value{font-size:16px;font-weight:600;color:var(--text-primary)}
-.calc-total{padding:16px 20px;border-radius:var(--radius-lg);margin-bottom:12px}
-.calc-total.primary{background:rgba(94,106,210,.08);border:1px solid rgba(94,106,210,.15)}
-.calc-total.green-bg{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15)}
-.calc-total .total-label{font-size:12px;color:var(--text-tertiary)}
-.calc-total .total-value{font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-.5px}
-.calc-total .total-sub{font-size:16px;font-weight:600;color:var(--accent)}
-.calc-total.green-bg .total-value,.calc-total.green-bg .total-sub{color:var(--green)}
-.niche-card{padding:20px;background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-lg);transition:all .15s}
-.niche-card:hover{border-color:rgba(255,255,255,.12)}
-.niche-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.niche-name{font-size:15px;font-weight:600;color:var(--text-primary)}
-.niche-badge{font-size:11px;padding:3px 10px;border-radius:var(--radius-full);font-weight:600}
-.niche-badge.high{background:rgba(16,185,129,.12);color:var(--green)}
-.niche-badge.medium{background:rgba(245,158,11,.12);color:var(--amber)}
-.niche-tags{display:flex;flex-wrap:wrap;gap:6px}
-.niche-tag{font-size:12px;padding:4px 10px;background:var(--bg-panel);border-radius:var(--radius-full);color:var(--text-tertiary);cursor:pointer;transition:all .15s;border:1px solid transparent}
-.niche-tag:hover{color:var(--text-primary);border-color:var(--border-std)}
-.ml-card{padding:16px;background:var(--bg-surface);border:1px solid var(--border-std);border-radius:var(--radius-lg);display:flex;justify-content:space-between;align-items:center}
-.ml-title{font-size:14px;font-weight:500;color:var(--text-primary)}
-.ml-price{font-size:18px;font-weight:700;color:var(--amber)}
-.spinner{width:18px;height:18px;border:2px solid var(--border-std);border-top-color:var(--accent);border-radius:50%;animation:spin .5s linear infinite;flex-shrink:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t2);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.app{display:flex;height:100vh;overflow:hidden}
+/* Sidebar */
+aside{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--b);display:flex;flex-direction:column;padding:14px 10px}
+.logo{padding:8px 6px 18px;display:flex;align-items:center;gap:8px}
+.logo-icon{width:28px;height:28px;background:linear-gradient(135deg,var(--brand),#a855f7);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.logo-text{font-size:17px;font-weight:700;letter-spacing:-.3px;color:var(--t1)}
+nav{flex:1;display:flex;flex-direction:column;gap:1px}
+.nav-i{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:var(--r);font-size:13px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .12s}
+.nav-i:hover{background:var(--bg3);color:var(--t2)}
+.nav-i.on{background:rgba(99,102,241,.12);color:var(--brand2);font-weight:600}
+.nav-i .ico{font-size:14px;width:20px;text-align:center}
+aside footer{padding:10px 9px;border-top:1px solid var(--b);font-size:11px;color:var(--t4);font-weight:500}
+/* Main */
+main{flex:1;overflow:auto;padding:28px 32px}
+.pg{display:none;animation:in .2s ease}
+.pg.on{display:block}
+@keyframes in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+h1{font-size:22px;font-weight:600;color:var(--t1);letter-spacing:-.2px;margin-bottom:2px}
+.st{font-size:13px;color:var(--t3);margin-bottom:24px}
+/* Cards */
+.c{background:var(--bg3);border:1px solid var(--b);border-radius:var(--r3);padding:18px;transition:border .15s}
+.c:hover{border-color:var(--b2)}
+.sc{background:var(--bg4);border:1px solid var(--b);border-radius:var(--r3);padding:16px 18px}
+.sl{font-size:10px;font-weight:600;color:var(--t4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.sv{font-size:26px;font-weight:700;color:var(--t1);letter-spacing:-.4px;line-height:1.1}
+.sv.b{color:var(--brand2)}.sv.g{color:var(--green)}.sv.a{color:var(--amber)}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;transition:all .12s;border:none;white-space:nowrap}
+.btn-p{background:var(--brand);color:#fff}.btn-p:hover{background:var(--brand2)}
+.btn-g{background:var(--bg3);color:var(--t2);border:1px solid var(--b)}.btn-g:hover{background:var(--bg4);color:var(--t1)}
+/* Inputs */
+input,select{font-family:inherit;font-size:13px;padding:7px 10px;background:var(--bg);border:1px solid var(--b);border-radius:var(--r);color:var(--t1);outline:none;transition:border .15s}
+input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
+input::placeholder{color:var(--t4)}
+select{appearance:none;padding-right:24px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%2371717a'%3E%3Cpath d='M2 3l3 3 3-3'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+/* Product cards */
+.pc{display:flex;gap:14px;padding:14px;background:var(--bg3);border:1px solid var(--b);border-radius:var(--r3);transition:all .15s;animation:up .25s ease backwards}
+.pc:hover{border-color:var(--b2)}
+.pc:nth-child(1){animation-delay:0s}.pc:nth-child(2){animation-delay:.03s}.pc:nth-child(3){animation-delay:.06s}.pc:nth-child(4){animation-delay:.09s}.pc:nth-child(5){animation-delay:.12s}.pc:nth-child(6){animation-delay:.15s}.pc:nth-child(7){animation-delay:.18s}.pc:nth-child(8){animation-delay:.21s}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.pi{width:84px;height:84px;flex-shrink:0;border-radius:var(--r2);background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:26px}
+.pi img{width:100%;height:100%;object-fit:cover}
+.pn{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pn a{color:inherit;text-decoration:none}.pn a:hover{color:var(--brand2)}
+.pm{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:2px}
+.bd{display:inline-flex;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:600}
+.bd-s{background:rgba(99,102,241,.12);color:var(--brand2)}
+.bd-c{background:var(--bg4);color:var(--t3)}
+.pv{text-align:right;flex-shrink:0}
+.pv .price{font-size:19px;font-weight:700;color:var(--t1);letter-spacing:-.2px}
+.pv .lbl{font-size:10px;color:var(--t4)}
+/* Charts */
+.cw{position:relative;width:100%;height:200px}
+/* Hunter form */
+.hf{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.hf .fd{display:flex;flex-direction:column;gap:3px}
+.hf .fd label{font-size:10px;font-weight:600;color:var(--t4);text-transform:uppercase;letter-spacing:.4px}
+/* Results grid */
+.rg{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
+/* Status */
+.ok{color:var(--green);font-size:13px;font-weight:500}
+.err{color:var(--red);font-size:13px;font-weight:500}
+/* Calculator */
+.calc-row{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px}
+.calc-box{padding:10px 14px;background:var(--bg);border-radius:var(--r);text-align:center}
+.calc-box .lbl{font-size:10px;color:var(--t4);margin-bottom:2px}
+.calc-box .val{font-size:15px;font-weight:600;color:var(--t1)}
+.ct{border-radius:var(--r3);padding:14px 18px;margin-bottom:8px}
+.ct.p{background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.12)}
+.ct.g{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.12)}
+.ct .tl{font-size:11px;color:var(--t3)}
+.ct .tv{font-size:26px;font-weight:700;color:var(--t1);letter-spacing:-.3px}
+.ct .ts{font-size:15px;font-weight:600;color:var(--brand2)}
+.ct.g .tv,.ct.g .ts{color:var(--green)}
+/* Niches */
+.nc{padding:18px;background:var(--bg3);border:1px solid var(--b);border-radius:var(--r3);transition:border .15s}
+.nc:hover{border-color:var(--b2)}
+.nc .nh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.nc .nname{font-size:14px;font-weight:600;color:var(--t1)}
+.nc .nbadge{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600}
+.nc .nbadge.high{background:rgba(34,197,94,.1);color:var(--green)}
+.nc .nbadge.med{background:rgba(245,158,11,.1);color:var(--amber)}
+.ntags{display:flex;flex-wrap:wrap;gap:5px}
+.nt{font-size:11px;padding:3px 9px;background:var(--bg);border-radius:99px;color:var(--t3);cursor:pointer;transition:all .12s;border:1px solid transparent}
+.nt:hover{color:var(--t1);border-color:var(--b)}
+/* ML */
+.mlc{padding:14px;background:var(--bg3);border:1px solid var(--b);border-radius:var(--r3);display:flex;justify-content:space-between;align-items:center}
+.mlc .mt{font-size:13px;font-weight:500;color:var(--t1)}
+.mlc .mp{font-size:17px;font-weight:700;color:var(--amber)}
+/* Loading */
+.ls{display:flex;align-items:center;gap:8px;padding:12px 0;color:var(--t3)}
+.sp{width:16px;height:16px;border:2px solid var(--b);border-top-color:var(--brand);border-radius:50%;animation:spin .5s linear infinite;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-state{display:flex;align-items:center;gap:8px;padding:16px 0;color:var(--text-tertiary);font-size:14px}
-.empty-state{text-align:center;padding:40px 20px;color:var(--text-quaternary)}
-.empty-icon{font-size:40px;margin-bottom:12px}
-.chart-wrap{position:relative;width:100%;height:220px}
-.chart-wrap canvas{width:100%!important;height:100%!important}
-::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:3px}
-.toast{position:fixed;top:16px;right:16px;padding:10px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;z-index:100;animation:fadeIn .25s ease}
-.toast-ok{background:#065f46;border:1px solid #059669;color:#d1fae5}
-.toast-err{background:#7f1d1d;border:1px solid #dc2626;color:#fee2e2}
+.es{text-align:center;padding:36px 20px;color:var(--t4)}.es .ei{font-size:36px;margin-bottom:8px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.04);border-radius:2px}
+.toast{position:fixed;top:14px;right:14px;padding:9px 14px;border-radius:var(--r);font-size:12px;font-weight:500;z-index:99;animation:in .2s ease}
+.toast-ok{background:#064e3b;border:1px solid #059669;color:#d1fae5}
+.toast-e{background:#7f1d1d;border:1px solid #dc2626;color:#fee2e2}
 </style>
 </head>
 <body>
-<div id="app"><aside class="sidebar"><div class="sidebar-logo"><span>UY</span>Hunter</div><nav class="sidebar-nav" id="nav"></nav><div class="sidebar-footer" id="api-foot">Conectando...</div></aside><main class="main" id="main-content"></main></div>
+<div class="app">
+<aside>
+  <div class="logo"><div class="logo-icon">📦</div><div class="logo-text">UYHunter</div></div>
+  <nav id="nav"></nav>
+  <footer id="api-foot">Conectando...</footer>
+</aside>
+<main id="mc"></main>
+</div>
 
 <script>
-var API='/api';
-var NAV=[{id:'dashboard',icon:'📊',label:'Dashboard'},{id:'hunter',icon:'🤖',label:'Product Hunter'},{id:'products',icon:'📦',label:'Productos'},{id:'calculator',icon:'🧮',label:'Calculadora'},{id:'ml',icon:'🔍',label:'ML Uruguay'},{id:'niches',icon:'🔥',label:'Tendencias'}];
-var catChart=null,priceChart=null;
+var A='/api';
+var NAVS=[{id:'hunter',ico:'🤖',l:'Hunter'},{id:'dashboard',ico:'📊',l:'Dashboard'},{id:'products',ico:'📦',l:'Productos'},{id:'calculator',ico:'🧮',l:'Calculadora'},{id:'ml',ico:'🔍',l:'ML Uruguay'},{id:'niches',ico:'🔥',l:'Tendencias'}];
+var cc=null,pc2=null;
 
 (function init(){
-  var nav=document.getElementById('nav');
-  NAV.forEach(function(n){
-    var el=document.createElement('div');
-    el.className='nav-item'+(n.id==='dashboard'?' active':'');
-    el.id='nav-'+n.id;
-    el.innerHTML='<span class="nav-icon">'+n.icon+'</span>'+n.label;
-    el.onclick=function(){switchPage(n.id)};
-    nav.appendChild(el);
+  var n=document.getElementById('nav');
+  NAVS.forEach(function(x){
+    var e=document.createElement('div');
+    e.className='nav-i'+(x.id==='hunter'?' on':'');
+    e.id='nv-'+x.id;
+    e.innerHTML='<span class="ico">'+x.ico+'</span>'+x.l;
+    e.onclick=function(){go(x.id)};
+    n.appendChild(e);
   });
-  var main=document.getElementById('main-content');
-  NAV.forEach(function(n){
-    var page=document.createElement('div');
-    page.className='page'+(n.id==='dashboard'?' active':'');
-    page.id='page-'+n.id;
-    page.innerHTML='<div class="loading-state"><div class="spinner"></div>Cargando...</div>';
-    main.appendChild(page);
+  var m=document.getElementById('mc');
+  NAVS.forEach(function(x){
+    var p=document.createElement('div');
+    p.className='pg'+(x.id==='hunter'?' on':'');
+    p.id='pg-'+x.id;
+    m.appendChild(p);
   });
-  loadDashboard();
-  fetch(API+'/health').then(function(r){return r.json()}).then(function(d){
+  buildHunter();buildCalc();buildML();
+  fetch(A+'/health').then(function(r){return r.json()}).then(function(d){
     document.getElementById('api-foot').textContent='API online '+d.total_products+' prod';
   }).catch(function(){document.getElementById('api-foot').textContent='API offline'});
 })();
 
-function switchPage(id){
-  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
-  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
-  document.getElementById('page-'+id).classList.add('active');
-  document.getElementById('nav-'+id).classList.add('active');
-  if(id==='dashboard') loadDashboard();
-  if(id==='products') loadProducts();
+function go(id){
+  document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on')});
+  document.querySelectorAll('.nav-i').forEach(function(n){n.classList.remove('on')});
+  document.getElementById('pg-'+id).classList.add('on');
+  document.getElementById('nv-'+id).classList.add('on');
+  if(id==='dashboard') loadDash();
+  if(id==='products') loadProds();
   if(id==='niches') loadNiches();
 }
+function toast(m,ok){var t=document.createElement('div');t.className='toast '+(ok?'toast-ok':'toast-e');t.textContent=m;document.body.appendChild(t);setTimeout(function(){t.remove()},3000)}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function img(u){return u?'<img src="'+esc(u)+'" alt="" onerror="this.style.display=\\\'none\\\'">':''}
 
-function toast(msg,ok){var t=document.createElement('div');t.className='toast '+(ok?'toast-ok':'toast-err');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},3000)}
-
-function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
-
-function imgOrPlaceholder(url){return url?'<img src="'+escHtml(url)+'" alt="" onerror="this.style.display=\\\'none\\\'">':''}
-
-// ═════════ DASHBOARD ═════════
-async function loadDashboard(){
-  var page=document.getElementById('page-dashboard');
-  try{
-    var r=await fetch(API+'/stats');var d=await r.json();
-    page.innerHTML='<h1>Dashboard</h1><p class="subtitle">Resumen de tu operacion de importacion</p>'+
-      '<div class="stats-grid">'+
-        '<div class="stat-card"><div class="stat-label">Productos</div><div class="stat-value">'+(d.total_products||0)+'</div></div>'+
-        '<div class="stat-card"><div class="stat-label">Precio promedio</div><div class="stat-value accent">$'+(d.avg_price_usd||0).toFixed(2)+'</div></div>'+
-        '<div class="stat-card"><div class="stat-label">Ultimos 7 dias</div><div class="stat-value green">'+(d.recent_7d||0)+'</div></div>'+
-        '<div class="stat-card"><div class="stat-label">Fuentes</div><div class="stat-value amber">'+Object.keys(d.by_source||{}).length+'</div></div>'+
+// ════════ HUNTER ════════
+function buildHunter(){
+  document.getElementById('pg-hunter').innerHTML=
+    '<div style="margin-bottom:20px">'+
+      '<h1>Product Hunter</h1>'+
+      '<p class="st">Encontra productos para importar. Solo pone tu rango de precios y busca.</p>'+
+    '</div>'+
+    '<div class="c" style="margin-bottom:16px">'+
+      '<div class="hf">'+
+        '<div class="fd" style="flex:1;min-width:170px"><label>Palabras clave (opcional)</label><input type="text" id="q" placeholder="Dejar vacio para buscar en todas las categorias..."></div>'+
+        '<div class="fd"><label>Precio desde $</label><input type="number" id="pmin" placeholder="0" step="0.01" style="width:100px"></div>'+
+        '<div class="fd"><label>Precio hasta $</label><input type="number" id="pmax" placeholder="inf" step="0.01" style="width:100px"></div>'+
+        '<div class="fd"><label>Resultados</label><select id="lim"><option>10</option><option selected>20</option><option>30</option><option>50</option></select></div>'+
+        '<div class="fd"><label>&nbsp;</label><button class="btn btn-p" id="hbtn" onclick="hunt()">Buscar Productos</button></div>'+
       '</div>'+
-      '<div class="grid-2">'+
-        '<div class="card"><h3>Productos por Categoria</h3><div class="chart-wrap"><canvas id="catChart"></canvas></div></div>'+
-        '<div class="card"><h3>Distribucion de Precios</h3><div class="chart-wrap"><canvas id="priceChart"></canvas></div></div>'+
-      '</div>';
-    setTimeout(function(){renderCharts(d.by_category||{})},200);
-  }catch(e){page.innerHTML='<h1>Dashboard</h1><p class="subtitle">Error al cargar</p>'}
+      '<div style="font-size:11px;color:var(--t4);margin-top:8px">Sin palabras clave busca aleatoriamente entre todas las categorias populares</div>'+
+    '</div>'+
+    '<div id="hs" style="margin-bottom:12px"></div>'+
+    '<div id="hr" class="rg"></div>';
 }
 
-function renderCharts(data){
-  var labels=Object.keys(data),values=Object.values(data),colors=['#5e6ad2','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
-  if(!labels.length){labels=['Sin datos'];values=[1]}
-  var ctx1=document.getElementById('catChart');
-  if(ctx1){
-    if(catChart) catChart.destroy();
-    catChart=new Chart(ctx1,{type:'doughnut',data:{labels:labels,datasets:[{data:values,backgroundColor:colors,borderWidth:2,borderColor:'#191a1b'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8a8f98',padding:12,font:{size:11},usePointStyle:true}}}}});
-  }
-  var ctx2=document.getElementById('priceChart');
-  if(ctx2){
-    if(priceChart) priceChart.destroy();
-    priceChart=new Chart(ctx2,{type:'bar',data:{labels:labels,datasets:[{label:'Productos',data:values,backgroundColor:'#5e6ad2',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#8a8f98'}},x:{grid:{display:false},ticks:{color:'#8a8f98'}}}}});
-  }
-}
-
-// ═════════ HUNTER ═════════
-(function buildHunter(){
-  document.getElementById('page-hunter').innerHTML='<h1>Product Hunter</h1><p class="subtitle">Encontra productos en Banggood para importar a Uruguay</p>'+
-    '<div class="card mb-4"><div class="hunter-form">'+
-      '<div class="field" style="flex:1;min-width:200px"><label>Que producto buscas?</label><input type="text" id="h-kw" value="auriculares bluetooth" placeholder="Ej: smartwatch, lampara led..."></div>'+
-      '<div class="field"><label>Precio min $</label><input type="number" id="h-min" value="0" step="0.01" style="width:100px"></div>'+
-      '<div class="field"><label>Precio max $</label><input type="number" id="h-max" placeholder="inf" step="0.01" style="width:100px"></div>'+
-      '<div class="field"><label>Cantidad</label><select id="h-limit"><option>5</option><option selected>10</option><option>20</option><option>30</option></select></div>'+
-      '<div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="h-btn" onclick="runHunter()">Buscar</button></div>'+
-    '</div></div>'+
-    '<div id="h-status" class="mb-4"></div><div id="h-results"></div>';
-})();
-
-async function runHunter(){
-  var btn=document.getElementById('h-btn'),status=document.getElementById('h-status'),results=document.getElementById('h-results');
-  btn.disabled=true;btn.textContent='Buscando...';
-  status.innerHTML='<div class="loading-state"><div class="spinner"></div>Buscando productos en Banggood...</div>';
-  results.innerHTML='';
+async function hunt(){
+  var b=document.getElementById('hbtn'),s=document.getElementById('hs'),r=document.getElementById('hr');
+  b.disabled=true;b.textContent='Buscando...';
+  s.innerHTML='<div class="ls"><div class="sp"></div>Buscando productos en Banggood...</div>';
+  r.innerHTML='';
   try{
-    var body={keywords:document.getElementById('h-kw').value,max_products:parseInt(document.getElementById('h-limit').value)};
-    var min=parseFloat(document.getElementById('h-min').value),max=parseFloat(document.getElementById('h-max').value);
+    var body={max_products:parseInt(document.getElementById('lim').value)};
+    var kw=document.getElementById('q').value.trim();
+    if(kw) body.keywords=kw;
+    var min=parseFloat(document.getElementById('pmin').value),max=parseFloat(document.getElementById('pmax').value);
     if(min>0) body.min_price=min; if(max>0) body.max_price=max;
-    var r=await fetch(API+'/hunter/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    var d=await r.json();
-    if(!d.success){status.innerHTML='<span class="status-err">Error: '+(d.error||'desconocido')+'</span>';btn.disabled=false;btn.textContent='Buscar';return}
-    status.innerHTML='<span class="status-ok">'+d.added+' productos encontrados en Banggood</span>';
-    if(!d.products.length){results.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div>No se encontraron productos. Proba con otras keywords.</div>';btn.disabled=false;btn.textContent='Buscar';return}
-    results.innerHTML=d.products.map(function(p){
-      return '<div class="product-card">'+
-        '<div class="product-img">'+(p.image_url?'<img src="'+escHtml(p.image_url)+'" alt="" onerror="this.style.display=\\\'none\\\'">':'')+'</div>'+
-        '<div class="product-info">'+
-          '<div class="product-title"><a href="'+escHtml(p.url)+'" target="_blank">'+escHtml(p.title)+'</a></div>'+
-          '<div class="product-meta"><span class="badge badge-source">'+p.source+'</span><span class="badge badge-cat">'+(p.category||'general')+'</span></div>'+
-          '<div class="product-id">ID: '+p.product_id+'</div>'+
+    var resp=await fetch(A+'/hunter/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d=await resp.json();
+    if(!d.success){s.innerHTML='<span class="err">Error: '+(d.error||'desconocido')+'</span>';b.disabled=false;b.textContent='Buscar Productos';return}
+    s.innerHTML='<span class="ok">'+d.added+' productos encontrados'+(d.keywords?' para "'+d.keywords+'"':'')+'</span>';
+    if(!d.products.length){r.innerHTML='<div class="es"><div class="ei">🔍</div>No se encontraron productos. Ajusta los filtros de precio.</div>';b.disabled=false;b.textContent='Buscar Productos';return}
+    r.innerHTML=d.products.map(function(p){
+      return '<div class="pc">'+
+        '<div class="pi">'+img(p.image_url)+'</div>'+
+        '<div class="pn-wrap" style="flex:1;min-width:0">'+
+          '<div class="pn"><a href="'+esc(p.url)+'" target="_blank">'+esc(p.title)+'</a></div>'+
+          '<div class="pm"><span class="bd bd-s">'+p.source+'</span><span class="bd bd-c">'+(p.category||'general')+'</span></div>'+
+          '<div style="font-size:10px;color:var(--t4);font-family:JetBrains Mono,monospace">ID: '+p.product_id+'</div>'+
         '</div>'+
-        '<div class="product-price"><div class="price-value">$'+p.price_usd.toFixed(2)+'</div><div class="price-label">mayorista</div>'+
-        '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="quickCalc('+p.price_usd+',\''+(p.category||'default')+'\')">Calcular costo</button></div>'+
+        '<div class="pv"><div class="price">$'+p.price_usd.toFixed(2)+'</div><div class="lbl">mayorista</div>'+
+        '<button class="btn btn-g" style="margin-top:6px;font-size:11px;padding:3px 8px" onclick="qcalc('+p.price_usd+',\''+(p.category||'default')+'\')">Calcular</button></div>'+
       '</div>';
     }).join('');
-  }catch(e){status.innerHTML='<span class="status-err">Error: '+e.message+'</span>'}
-  btn.disabled=false;btn.textContent='Buscar';
+  }catch(e){s.innerHTML='<span class="err">Error: '+e.message+'</span>'}
+  b.disabled=false;b.textContent='Buscar Productos';
 }
 
-// ═════════ PRODUCTS ═════════
-async function loadProducts(){
-  var page=document.getElementById('page-products');
-  page.innerHTML='<h1>Productos</h1><p class="subtitle">Pipeline de productos encontrados</p><div class="loading-state"><div class="spinner"></div>Cargando...</div>';
+// ════════ DASHBOARD ════════
+async function loadDash(){
+  var p=document.getElementById('pg-dashboard');
+  p.innerHTML='<div class="ls"><div class="sp"></div>Cargando...</div>';
   try{
-    var r=await fetch(API+'/products?limit=50');var prods=await r.json();
-    if(!prods.length){page.innerHTML='<h1>Productos</h1><p class="subtitle">Pipeline de productos encontrados</p><div class="empty-state"><div class="empty-icon">📦</div>No hay productos todavia. Usa el Hunter para buscar.</div>';return}
-    page.innerHTML='<h1>Productos</h1><p class="subtitle">Pipeline de productos encontrados</p>'+prods.map(function(p){
-      return '<div class="product-card">'+
-        '<div class="product-img">'+(p.image_url?'<img src="'+escHtml(p.image_url)+'" alt="" onerror="this.style.display=\\\'none\\\'">':'')+'</div>'+
-        '<div class="product-info">'+
-          '<div class="product-title">'+escHtml(p.name||'Sin nombre')+'</div>'+
-          '<div class="product-meta"><span class="badge badge-source">'+(p.source||'?')+'</span><span class="badge badge-cat">'+(p.category||'general')+'</span><span style="font-size:11px;color:var(--text-quaternary)">'+(p.created_at||'')+'</span></div>'+
-        '</div>'+
-        '<div class="product-price"><div class="price-value">$'+(p.product_cost_usd||0).toFixed(2)+'</div></div>'+
-      '</div>';
-    }).join('');
-  }catch(e){page.innerHTML='<h1>Productos</h1><p class="subtitle">Error: '+e.message+'</div>'}
-}
-
-// ═════════ CALCULATOR ═════════
-function quickCalc(cost,cat){switchPage('calculator');setTimeout(function(){document.getElementById('c-cost').value=cost;document.getElementById('c-cat').value=cat||'default';runCalc()},200)}
-(function buildCalc(){
-  document.getElementById('page-calculator').innerHTML='<h1>Calculadora de Importacion</h1><p class="subtitle">Calcula el costo real de traer productos a Uruguay</p>'+
-    '<div class="grid-2">'+
-      '<div class="card"><h3>Datos del Producto</h3><div style="display:flex;flex-direction:column;gap:12px">'+
-        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Precio del producto (USD)</label><input type="number" id="c-cost" value="5" step="0.01" style="width:100%"></div>'+
-        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Costo de envio por unidad (USD)</label><input type="number" id="c-ship" value="3" step="0.01" style="width:100%"></div>'+
-        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Cantidad</label><input type="number" id="c-qty" value="10" style="width:100%"></div>'+
-        '<div><label style="font-size:11px;font-weight:600;color:var(--text-quaternary);text-transform:uppercase;display:block;margin-bottom:4px">Categoria (afecta arancel)</label>'+
-          '<select id="c-cat" style="width:100%"><option value="tecnologia">Tecnologia (2% arancel)</option><option value="accesorios">Accesorios Movil (10%)</option><option value="hogar">Hogar (10%)</option><option value="belleza">Belleza (14%)</option><option value="fitness">Fitness (14%)</option><option value="mascotas">Mascotas (14%)</option><option value="auto">Acc. Auto (14%)</option><option value="default" selected>General (14%)</option></select></div>'+
-        '<button class="btn btn-primary" style="justify-content:center" onclick="runCalc()">Calcular Costo Total</button>'+
-      '</div></div>'+
-      '<div class="card" id="c-result"><h3>Resultado</h3><div class="empty-state">Ingresa los datos y calcula</div></div>'+
-    '</div>';
-})();
-async function runCalc(){
-  var res=document.getElementById('c-result');
-  res.innerHTML='<h3>Resultado</h3><div class="loading-state"><div class="spinner"></div>Calculando...</div>';
-  try{
-    var body={product_cost:parseFloat(document.getElementById('c-cost').value),shipping:parseFloat(document.getElementById('c-ship').value),quantity:parseInt(document.getElementById('c-qty').value),category:document.getElementById('c-cat').value};
-    var r=await fetch(API+'/calculate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    var d=await r.json();
-    res.innerHTML='<h3>Resultado</h3>'+
-      '<div class="calc-grid">'+
-        '<div class="calc-item"><div class="label">Costo producto</div><div class="value">$'+d.cost_usd+'</div></div>'+
-        '<div class="calc-item"><div class="label">Envio</div><div class="value">$'+d.shipping_usd+'</div></div>'+
-        '<div class="calc-item"><div class="label">Arancel ('+d.tariff_rate+')</div><div class="value">$'+d.tariff_usd+'</div></div>'+
-        '<div class="calc-item"><div class="label">IVA ('+d.iva_rate+')</div><div class="value">$'+d.iva_usd+'</div></div>'+
+    var r=await fetch(A+'/stats');var d=await r.json();
+    p.innerHTML=
+      '<h1>Dashboard</h1><p class="st">Resumen de tu operacion de importacion</p>'+
+      '<div class="g4">'+
+        '<div class="sc"><div class="sl">Productos</div><div class="sv">'+(d.total_products||0)+'</div></div>'+
+        '<div class="sc"><div class="sl">Precio Promedio</div><div class="sv b">$'+(d.avg_price_usd||0).toFixed(2)+'</div></div>'+
+        '<div class="sc"><div class="sl">Ult. 7 dias</div><div class="sv g">'+(d.recent_7d||0)+'</div></div>'+
+        '<div class="sc"><div class="sl">Fuentes</div><div class="sv a">'+Object.keys(d.by_source||{}).length+'</div></div>'+
       '</div>'+
-      '<div class="calc-total primary"><div class="total-label">Costo total en USD</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="total-value">$'+d.total_usd+'</div><div class="total-sub">$'+d.cost_per_unit+' / unidad</div></div></div>'+
-      '<div class="calc-total green-bg"><div class="total-label">En pesos uruguayos (USD 1 = $U 43)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="total-value">$U '+d.total_uyu.toLocaleString()+'</div><div class="total-sub">$U '+d.cpu_uyu.toLocaleString()+' / unidad</div></div></div>';
-  }catch(e){res.innerHTML='<h3>Resultado</h3><span class="status-err">Error: '+e.message+'</span>'}
+      '<div class="g2">'+
+        '<div class="c"><h2 style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:12px">Categorias</h2><div class="cw"><canvas id="catC"></canvas></div></div>'+
+        '<div class="c"><h2 style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:12px">Precios</h2><div class="cw"><canvas id="priceC"></canvas></div></div>'+
+      '</div>';
+    setTimeout(function(){charts(d.by_category||{})},150);
+  }catch(e){p.innerHTML='<h1>Dashboard</h1><p class="st">Error al cargar</p>'}
 }
 
-// ═════════ ML ═════════
-(function buildML(){
-  document.getElementById('page-ml').innerHTML='<h1>MercadoLibre Uruguay</h1><p class="subtitle">Compara precios locales para calcular tu margen</p>'+
-    '<div class="card mb-4"><div class="hunter-form">'+
-      '<div class="field" style="flex:1;min-width:200px"><label>Buscar en ML Uruguay</label><input type="text" id="ml-kw" placeholder="Ej: auriculares bluetooth"></div>'+
-      '<div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="runML()">Buscar en ML</button></div>'+
-      '<div class="field"><label>&nbsp;</label><a id="ml-direct" href="#" target="_blank" class="btn btn-ghost">Abrir ML</a></div>'+
-    '</div></div><div id="ml-status" class="mb-4"></div><div id="ml-results"></div>';
-})();
-async function runML(){
-  var kw=document.getElementById('ml-kw').value;if(!kw){toast('Ingresa un termino',false);return}
-  document.getElementById('ml-direct').href='https://listado.mercadolibre.com.uy/'+encodeURIComponent(kw);
-  var status=document.getElementById('ml-status'),results=document.getElementById('ml-results');
-  status.innerHTML='<div class="loading-state"><div class="spinner"></div>Buscando en ML Uruguay...</div>';results.innerHTML='';
+function charts(data){
+  var lbs=Object.keys(data),vls=Object.values(data),cls=['#6366f1','#22c55e','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6'];
+  if(!lbs.length){lbs=['Sin datos'];vls=[1]}
+  var ctx1=document.getElementById('catC');
+  if(ctx1){if(cc) cc.destroy();cc=new Chart(ctx1,{type:'doughnut',data:{labels:lbs,datasets:[{data:vls,backgroundColor:cls,borderWidth:2,borderColor:'#18181c'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#71717a',padding:10,font:{size:10},usePointStyle:true}}}}})}
+  var ctx2=document.getElementById('priceC');
+  if(ctx2){if(pc2) pc2.destroy();pc2=new Chart(ctx2,{type:'bar',data:{labels:lbs,datasets:[{label:'Productos',data:vls,backgroundColor:'#6366f1',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(255,255,255,.03)'},ticks:{color:'#71717a'}},x:{grid:{display:false},ticks:{color:'#71717a',font:{size:9}}}}}})}
+}
+
+// ════════ PRODUCTS ════════
+async function loadProds(){
+  var p=document.getElementById('pg-products');
+  p.innerHTML='<h1>Productos</h1><p class="st">Pipeline de productos encontrados</p><div class="ls"><div class="sp"></div>Cargando...</div>';
   try{
-    var r=await fetch(API+'/ml-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keywords:kw})});
-    var d=await r.json();
-    if(!d.success){status.innerHTML='<span class="status-err">ML requiere navegador. <a href="'+d.ml_url+'" target="_blank" style="color:var(--accent)">Busca directamente en ML</a></span>';return}
-    status.innerHTML='<span class="status-ok">'+d.products.length+' resultados aproximados</span>';
-    if(!d.products.length){results.innerHTML='<div class="empty-state"><div class="empty-icon">🔍</div>No se encontraron resultados. Busca directamente en ML.</div>';return}
-    results.innerHTML=d.products.map(function(p){return '<div class="ml-card"><div class="ml-title">'+escHtml(p.title)+'</div><div class="ml-price">'+(p.price_uyu?'$U '+p.price_uyu:'?')+'</div></div>'}).join('');
-  }catch(e){status.innerHTML='<span class="status-err">Error: '+e.message+'</span>'}
+    var r=await fetch(A+'/products?limit=80');var prods=await r.json();
+    if(!prods.length){p.innerHTML='<h1>Productos</h1><p class="st">Pipeline de productos encontrados</p><div class="es"><div class="ei">📦</div>No hay productos. Usa el Hunter.</div>';return}
+    p.innerHTML='<h1>Productos</h1><p class="st">'+prods.length+' productos en pipeline</p>'+prods.map(function(x){
+      return '<div class="pc">'+
+        '<div class="pi">'+img(x.image_url)+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="pn">'+esc(x.name||'Sin nombre')+'</div>'+
+          '<div class="pm"><span class="bd bd-s">'+(x.source||'?')+'</span><span class="bd bd-c">'+(x.category||'general')+'</span><span style="font-size:10px;color:var(--t4)">'+(x.created_at||'')+'</span></div>'+
+        '</div>'+
+        '<div class="pv"><div class="price">$'+(x.product_cost_usd||0).toFixed(2)+'</div></div>'+
+      '</div>';
+    }).join('');
+  }catch(e){p.innerHTML='<h1>Productos</h1><p class="st">Error: '+e.message+'</p>'}
 }
 
-// ═════════ NICHES ═════════
+// ════════ CALCULATOR ════════
+function buildCalc(){
+  document.getElementById('pg-calculator').innerHTML=
+    '<h1>Calculadora de Importacion</h1><p class="st">Costo real de traer productos a Uruguay</p>'+
+    '<div class="g2">'+
+      '<div class="c">'+
+        '<h2 style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:14px">Datos del Producto</h2>'+
+        '<div style="display:flex;flex-direction:column;gap:10px">'+
+          '<div><div class="sl" style="display:block;margin-bottom:3px">Precio del producto (USD)</div><input type="number" id="cco" value="5" step="0.01" style="width:100%"></div>'+
+          '<div><div class="sl" style="display:block;margin-bottom:3px">Envio por unidad (USD)</div><input type="number" id="csh" value="3" step="0.01" style="width:100%"></div>'+
+          '<div><div class="sl" style="display:block;margin-bottom:3px">Cantidad</div><input type="number" id="cqt" value="10" style="width:100%"></div>'+
+          '<div><div class="sl" style="display:block;margin-bottom:3px">Categoria (arancel)</div>'+
+            '<select id="cca" style="width:100%"><option value="tecnologia">Tecnologia (2%)</option><option value="accesorios">Acc. Movil (10%)</option><option value="hogar">Hogar (10%)</option><option value="belleza">Belleza (14%)</option><option value="fitness">Fitness (14%)</option><option value="mascotas">Mascotas (14%)</option><option value="auto">Auto (14%)</option><option value="default" selected>General (14%)</option></select></div>'+
+          '<button class="btn btn-p" style="justify-content:center" onclick="calc()">Calcular Costo Total</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="c" id="cres"><h2 style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:14px">Resultado</h2><div class="es">Ingresa los datos</div></div>'+
+    '</div>';
+}
+function qcalc(cost,cat){go('calculator');setTimeout(function(){document.getElementById('cco').value=cost;document.getElementById('cca').value=cat||'default';calc()},200)}
+async function calc(){
+  var r=document.getElementById('cres');
+  r.innerHTML='<h2 style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:14px">Resultado</h2><div class="ls"><div class="sp"></div>Calculando...</div>';
+  try{
+    var body={product_cost:parseFloat(document.getElementById('cco').value),shipping:parseFloat(document.getElementById('csh').value),quantity:parseInt(document.getElementById('cqt').value),category:document.getElementById('cca').value};
+    var resp=await fetch(A+'/calculate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var d=await resp.json();
+    r.innerHTML='<h2 style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:14px">Resultado</h2>'+
+      '<div class="calc-row">'+
+        '<div class="calc-box"><div class="lbl">Costo producto</div><div class="val">$'+d.cost_usd+'</div></div>'+
+        '<div class="calc-box"><div class="lbl">Envio</div><div class="val">$'+d.shipping_usd+'</div></div>'+
+        '<div class="calc-box"><div class="lbl">Arancel ('+d.tariff_rate+')</div><div class="val">$'+d.tariff_usd+'</div></div>'+
+        '<div class="calc-box"><div class="lbl">IVA ('+d.iva_rate+')</div><div class="val">$'+d.iva_usd+'</div></div>'+
+      '</div>'+
+      '<div class="ct p"><div class="tl">Costo total en USD</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="tv">$'+d.total_usd+'</div><div class="ts">$'+d.cost_per_unit+' / u</div></div></div>'+
+      '<div class="ct g"><div class="tl">En pesos uruguayos (1 USD = $U 43)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="tv">$U '+d.total_uyu.toLocaleString()+'</div><div class="ts">$U '+d.cpu_uyu.toLocaleString()+' / u</div></div></div>';
+  }catch(e){r.innerHTML='<h2 style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:14px">Resultado</h2><span class="err">Error: '+e.message+'</span>'}
+}
+
+// ════════ ML ════════
+function buildML(){
+  document.getElementById('pg-ml').innerHTML=
+    '<h1>MercadoLibre Uruguay</h1><p class="st">Compara precios locales</p>'+
+    '<div class="c" style="margin-bottom:14px"><div class="hf">'+
+      '<div class="fd" style="flex:1;min-width:160px"><label>Buscar en ML</label><input type="text" id="mq" placeholder="Ej: auriculares bluetooth"></div>'+
+      '<div class="fd"><label>&nbsp;</label><button class="btn btn-p" onclick="ml()">Buscar</button></div>'+
+      '<div class="fd"><label>&nbsp;</label><a id="mld" href="#" target="_blank" class="btn btn-g">Abrir ML</a></div>'+
+    '</div></div><div id="ms" style="margin-bottom:12px"></div><div id="mr"></div>';
+}
+async function ml(){
+  var kw=document.getElementById('mq').value;if(!kw){toast('Ingresa un termino',false);return}
+  document.getElementById('mld').href='https://listado.mercadolibre.com.uy/'+encodeURIComponent(kw);
+  var s=document.getElementById('ms'),r=document.getElementById('mr');
+  s.innerHTML='<div class="ls"><div class="sp"></div>Buscando...</div>';r.innerHTML='';
+  try{
+    var resp=await fetch(A+'/ml-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keywords:kw})});
+    var d=await resp.json();
+    if(!d.success){s.innerHTML='<span class="err">ML requiere navegador. <a href="'+d.ml_url+'" target="_blank" style="color:var(--brand2)">Abrir ML</a></span>';return}
+    s.innerHTML='<span class="ok">'+d.products.length+' resultados aproximados</span>';
+    if(!d.products.length){r.innerHTML='<div class="es"><div class="ei">🔍</div>No se encontraron. Busca en ML.</div>';return}
+    r.innerHTML=d.products.map(function(x){return '<div class="mlc"><div class="mt">'+esc(x.title)+'</div><div class="mp">'+(x.price_uyu?'$U '+x.price_uyu:'?')+'</div></div>'}).join('');
+  }catch(e){s.innerHTML='<span class="err">Error: '+e.message+'</span>'}
+}
+
+// ════════ NICHES ════════
 async function loadNiches(){
-  var page=document.getElementById('page-niches');
-  page.innerHTML='<h1>Tendencias</h1><p class="subtitle">Nichos con alta demanda para importar</p><div class="loading-state"><div class="spinner"></div>Cargando...</div>';
+  var p=document.getElementById('pg-niches');
+  p.innerHTML='<h1>Tendencias</h1><p class="st">Nichos con alta demanda para importar</p><div class="ls"><div class="sp"></div>Cargando...</div>';
   try{
-    var r=await fetch(API+'/hunter/niches');var d=await r.json();
-    page.innerHTML='<h1>Tendencias</h1><p class="subtitle">Nichos con alta demanda para importar</p><div class="grid-2">'+d.niches.map(function(n){
-      return '<div class="niche-card">'+
-        '<div class="niche-header"><div class="niche-name">'+n.name+'</div><span class="niche-badge '+(n.demand==='alta'?'high':'medium')+'">'+(n.demand==='alta'?'Alta demanda':'Demanda media')+'</span></div>'+
-        '<div style="font-size:12px;color:var(--green);margin-bottom:12px;font-weight:500">Margen potencial: '+(n.margin==='alto'?'Alto':'Medio')+'</div>'+
-        '<div class="niche-tags">'+n.subcategories.map(function(s){return '<span class="niche-tag" onclick="searchNiche(\''+s+'\')">'+s+'</span>'}).join('')+'</div>'+
+    var r=await fetch(A+'/hunter/niches');var d=await r.json();
+    p.innerHTML='<h1>Tendencias</h1><p class="st">Nichos con alta demanda para importar</p><div class="g2">'+d.niches.map(function(n){
+      return '<div class="nc">'+
+        '<div class="nh"><div class="nname">'+n.name+'</div><span class="nbadge '+(n.demand==='alta'?'high':'med')+'">'+(n.demand==='alta'?'Alta demanda':'Media')+'</span></div>'+
+        '<div style="font-size:11px;color:var(--green);margin-bottom:10px;font-weight:500">Margen: '+(n.margin==='alto'?'Alto':'Medio')+'</div>'+
+        '<div class="ntags">'+n.subcategories.map(function(s){return '<span class="nt" onclick="sn(\''+s+'\')">'+s+'</span>'}).join('')+'</div>'+
       '</div>';
     }).join('')+'</div>';
-  }catch(e){page.innerHTML='<h1>Tendencias</h1><p class="subtitle">Error: '+e.message+'</div>'}
+  }catch(e){p.innerHTML='<h1>Tendencias</h1><p class="st">Error</p>'}
 }
-function searchNiche(kw){switchPage('hunter');setTimeout(function(){document.getElementById('h-kw').value=kw;runHunter()},300)}
+function sn(kw){go('hunter');setTimeout(function(){document.getElementById('q').value=kw;hunt()},250)}
 </script>
 </body>
 </html>

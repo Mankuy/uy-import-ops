@@ -194,7 +194,13 @@ async def hunter_search(request: Request):
     try: body = await request.json()
     except: body = {}
     kw = body.get("keywords","").strip()
-    if not kw: return JSONResponse({"error":"keywords required","success":False}, 400)
+    # If no keywords, pick a random trending subcategory
+    if not kw:
+        import random
+        all_subs = []
+        for n in NICHES:
+            all_subs.extend(n["subcategories"])
+        kw = random.choice(all_subs) if all_subs else "auriculares bluetooth"
     return await scrape_bg(kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
 
 @app.get("/api/products")
