@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Hunter Service v3 — Complete product sourcing & import calculator."""
-import os, re, json, sqlite3, hashlib, math
+"""Hunter Service v4 — Multi-source product sourcing & import calculator.
+
+Sources:
+  - Banggood: httpx direct scraping (no browser needed)
+  - AliExpress: via Camofox stealth browser (localhost:9377)
+"""
+import os, re, json, sqlite3, hashlib, math, random
 from datetime import datetime
 from urllib.parse import quote_plus
 
@@ -9,6 +14,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import httpx
+
+# Camofox integration for AliExpress
+try:
+    from scraper_camofox import scrape_aliexpress, check_camofox_status
+    CAMOFOX_AVAILABLE = True
+except ImportError:
+    CAMOFOX_AVAILABLE = False
+    async def scrape_aliexpress(*a, **kw):
+        return {"added": 0, "products": [], "success": False, "error": "scraper_camofox.py not found"}
+    async def check_camofox_status():
+        return {"camofox": "module_missing"}
 
 app = FastAPI(title="UY Import Ops — Product Sourcing")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -277,19 +293,30 @@ async def scrape_bg(keywords, min_price=None, max_price=None, max_products=20):
 
 # ═══════════════ API ═══════════════
 @app.get("/api/health")
-def health():
+async def health():
     with sqlite3.connect(DB_PATH) as c:
         total = c.execute("SELECT COUNT(*) FROM products").fetchone()[0]
-    return {"status":"ok","service":"hunter-v3","total_products":total,"time":datetime.utcnow().isoformat()}
+    camofox = await check_camofox_status()
+    return {
+        "status": "ok",
+        "service": "hunter-v4",
+        "total_products": total,
+        "sources": {"banggood": "always", **camofox},
+        "time": datetime.utcnow().isoformat(),
+    }
 
 @app.post("/api/hunter/search")
 async def hunter_search(request: Request):
+    """Search products across all available sources (Banggood + AliExpress)."""
     try: body = await request.json()
     except: body = {}
     kw = body.get("keywords","").strip()
-    import random
-    
-    # If no keywords, try up to 5 random trending keywords until we find products
+    source_filter = body.get("source", "all")  # 'all', 'banggood', 'aliexpress'
+    min_p = body.get("min_price")
+    max_p = body.get("max_price")
+    max_prod = body.get("max_products", 20)
+
+    # If no keywords, pick random trending
     if not kw:
         all_subs = []
         for n in NICHES:
@@ -299,25 +326,88 @@ async def hunter_search(request: Request):
         
         for candidate in candidates[:3]:
             en_kw = NICHES_EN.get(candidate, candidate)
-            result = await scrape_bg(en_kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
+            result = await _search_all_sources(en_kw, min_p, max_p, max_prod, source_filter)
             if result.get("added", 0) > 0:
                 result["keywords"] = candidate
                 result["searched_as"] = en_kw
                 return result
         
-        return {"added": 0, "keywords": "varios", "products": [], "success": True, "message": "No se encontraron productos en ese rango de precio. Amplia el rango o usa palabras clave en ingles."}
+        return {"added": 0, "keywords": "varios", "products": [], "success": True,
+                "message": "No se encontraron productos. Amplia el rango o usa palabras clave en ingles.",
+                "sources_searched": []}
     
-    # User provided keywords - try English first
+    # User provided keywords
     en_kw = NICHES_EN.get(kw, kw)
-    result = await scrape_bg(en_kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
+    result = await _search_all_sources(en_kw, min_p, max_p, max_prod, source_filter)
+    result["searched_as"] = en_kw
     if result.get("added", 0) > 0:
-        result["searched_as"] = en_kw
         return result
-    # Try original Spanish
+    # Try original Spanish if different
     if en_kw != kw:
-        result = await scrape_bg(kw, body.get("min_price"), body.get("max_price"), body.get("max_products",20))
+        result = await _search_all_sources(kw, min_p, max_p, max_prod, source_filter)
         result["searched_as"] = kw
-        return result
+    return result
+
+
+async def _search_all_sources(keywords, min_price, max_price, max_products, source_filter="all"):
+    """Query Banggood and/or AliExpress and merge results."""
+    import asyncio
+    all_products = []
+    sources_searched = []
+    errors = []
+
+    # ── Banggood (always fast, httpx direct) ──
+    if source_filter in ("all", "banggood"):
+        try:
+            bg_result = await scrape_bg(keywords, min_price, max_price, max_products)
+            if bg_result.get("success"):
+                all_products.extend(bg_result.get("products", []))
+                sources_searched.append("banggood")
+        except Exception as e:
+            errors.append(f"banggood: {e}")
+
+    # ── AliExpress via Camofox (stealth browser) ──
+    if source_filter in ("all", "aliexpress"):
+        try:
+            ae_result = await scrape_aliexpress(
+                keywords,
+                min_price=min_price,
+                max_price=max_price,
+                max_products=max_products,
+            )
+            if ae_result.get("success"):
+                all_products.extend(ae_result.get("products", []))
+                sources_searched.append("aliexpress")
+            elif ae_result.get("camofox_status") == "offline":
+                errors.append("aliexpress: Camofox offline")
+        except Exception as e:
+            errors.append(f"aliexpress: {e}")
+
+    return {
+        "added": len(all_products),
+        "keywords": keywords,
+        "products": all_products,
+        "success": len(all_products) > 0 or not errors,
+        "sources_searched": sources_searched,
+        "errors": errors if errors else None,
+    }
+
+
+@app.post("/api/hunter/search-ae")
+async def hunter_search_aliexpress(request: Request):
+    """Search AliExpress only via Camofox."""
+    try: body = await request.json()
+    except: body = {}
+    kw = body.get("keywords", "").strip()
+    if not kw:
+        return JSONResponse({"error": "keywords required for AliExpress", "success": False}, 400)
+    en_kw = NICHES_EN.get(kw, kw)
+    result = await scrape_aliexpress(
+        en_kw,
+        min_price=body.get("min_price"),
+        max_price=body.get("max_price"),
+        max_products=body.get("max_products", 20),
+    )
     result["searched_as"] = en_kw
     return result
 

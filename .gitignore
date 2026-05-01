@@ -6,3 +6,13 @@ __pycache__/
 *.db
 image_cache.json
 generated_designs/
+chrome_profile/
+fail_*.html
+fail_*.jpg
+*.log
+*.backup*
+cdp_result.json
+hunter_products.json
+hunter_input.txt
+current_surge_domain.txt
+

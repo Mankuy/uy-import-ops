@@ -10,6 +10,7 @@
 --bg:#0a0a0c;--bg2:#111114;--bg3:#18181c;--bg4:#1f1f24;
 --t1:#fafafa;--t2:#a1a1aa;--t3:#71717a;--t4:#52525b;
 --brand:#6366f1;--brand2:#818cf8;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;
+--ae:#e8590c;--ae2:#fb923c;--bg-col:#3b82f6;--bg2-col:#60a5fa;
 --b:rgba(255,255,255,.06);--b2:rgba(255,255,255,.1);
 --r:6px;--r2:10px;--r3:14px;
 }
@@ -64,7 +65,11 @@ select{appearance:none;padding-right:24px;background-image:url("data:image/svg+x
 .pm{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:2px}
 .bd{display:inline-flex;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:600}
 .bd-s{background:rgba(99,102,241,.12);color:var(--brand2)}
+.bd-ae{background:rgba(232,89,12,.12);color:var(--ae2)}
+.bd-bg{background:rgba(59,130,246,.12);color:var(--bg2-col)}
 .bd-c{background:var(--bg4);color:var(--t3)}
+.pc.src-ae{border-left:3px solid var(--ae)}
+.pc.src-bg{border-left:3px solid var(--bg-col)}
 .pv{text-align:right;flex-shrink:0}
 .pv .price{font-size:19px;font-weight:700;color:var(--t1);letter-spacing:-.2px}
 .pv .lbl{font-size:10px;color:var(--t4)}
@@ -115,6 +120,12 @@ select{appearance:none;padding-right:24px;background-image:url("data:image/svg+x
 .toast{position:fixed;top:14px;right:14px;padding:9px 14px;border-radius:var(--r);font-size:12px;font-weight:500;z-index:99;animation:in .2s ease}
 .toast-ok{background:#064e3b;border:1px solid #059669;color:#d1fae5}
 .toast-e{background:#7f1d1d;border:1px solid #dc2626;color:#fee2e2}
+.src-ind{display:flex;gap:6px;align-items:center;margin-bottom:10px}
+.src-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.src-dot.on{box-shadow:0 0 6px currentColor}
+.src-lbl{font-size:11px;font-weight:500}
+.foot-src{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.foot-row{display:flex;align-items:center;gap:5px;font-size:10px}
 </style>
 </head>
 <body>
@@ -151,7 +162,14 @@ var cc=null,pc2=null;
   });
   buildHunter();buildCalc();buildML();
   fetch(A+'/health').then(function(r){return r.json()}).then(function(d){
-    document.getElementById('api-foot').textContent='API online '+d.total_products+' prod';
+    var ft=document.getElementById('api-foot');
+    var bgSt='always';
+    var cfSt=(d.sources&&d.sources.camofox)||'offline';
+    ft.innerHTML='API online '+d.total_products+' prod'+
+      '<div class="foot-src">'+
+        '<div class="foot-row"><span class="src-dot on" style="color:var(--bg-col)"></span>Banggood: OK</div>'+
+        '<div class="foot-row"><span class="src-dot'+(cfSt==='online'?' on':'')+' " style="color:'+(cfSt==='online'?'var(--ae)':'var(--t4)')+'"></span>AliExpress: '+(cfSt==='online'?'✅ Camofox':'❌ Offline')+'</div>'+
+      '</div>';
   }).catch(function(){document.getElementById('api-foot').textContent='API offline'});
 })();
 
@@ -181,9 +199,10 @@ function buildHunter(){
         '<div class="fd"><label>Precio desde $</label><input type="number" id="pmin" placeholder="0" step="0.01" style="width:100px"></div>'+
         '<div class="fd"><label>Precio hasta $</label><input type="number" id="pmax" placeholder="inf" step="0.01" style="width:100px"></div>'+
         '<div class="fd"><label>Resultados</label><select id="lim"><option>10</option><option selected>20</option><option>30</option><option>50</option></select></div>'+
+        '<div class="fd"><label>Fuente</label><select id="hsrc"><option value="all">🌐 Todas</option><option value="banggood">🟦 Banggood</option><option value="aliexpress">🟠 AliExpress</option></select></div>'+
         '<div class="fd"><label>&nbsp;</label><button class="btn btn-p" id="hbtn" onclick="hunt()">Buscar Productos</button></div>'+
       '</div>'+
-      '<div style="font-size:11px;color:var(--t4);margin-top:8px">Sin palabras clave busca aleatoriamente entre todas las categorias populares</div>'+
+      '<div style="font-size:11px;color:var(--t4);margin-top:8px">AliExpress requiere Camofox corriendo local (<code>npm start</code> en camofox-browser)</div>'+
     '</div>'+
     '<div id="hs" style="margin-bottom:12px"></div>'+
     '<div id="hr" class="rg"></div>';
@@ -191,30 +210,43 @@ function buildHunter(){
 
 async function hunt(){
   var b=document.getElementById('hbtn'),s=document.getElementById('hs'),r=document.getElementById('hr');
+  var srcSel=document.getElementById('hsrc').value;
+  var srcLabel=srcSel==='aliexpress'?'AliExpress via Camofox':srcSel==='banggood'?'Banggood':'Banggood + AliExpress';
   b.disabled=true;b.textContent='Buscando...';
-  s.innerHTML='<div class="ls"><div class="sp"></div>Buscando productos en Banggood...</div>';
+  s.innerHTML='<div class="ls"><div class="sp"></div>Buscando en '+srcLabel+'...</div>';
   r.innerHTML='';
   try{
-    var body={max_products:parseInt(document.getElementById('lim').value)};
+    var body={max_products:parseInt(document.getElementById('lim').value),source:srcSel};
     var kw=document.getElementById('q').value.trim();
     if(kw) body.keywords=kw;
     var min=parseFloat(document.getElementById('pmin').value),max=parseFloat(document.getElementById('pmax').value);
     if(min>0) body.min_price=min; if(max>0) body.max_price=max;
     var resp=await fetch(A+'/hunter/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     var d=await resp.json();
-    if(!d.success){s.innerHTML='<span class="err">Error: '+(d.error||'desconocido')+'</span>';b.disabled=false;b.textContent='Buscar Productos';return}
-    s.innerHTML='<span class="ok">'+d.added+' productos encontrados'+(d.keywords?' para "'+d.keywords+'"':'')+'</span>';
-    if(!d.products.length){r.innerHTML='<div class="es"><div class="ei">🔍</div>No se encontraron productos. Ajusta los filtros de precio.</div>';b.disabled=false;b.textContent='Buscar Productos';return}
+    if(!d.success){s.innerHTML='<span class="err">Error: '+(d.error||(d.errors?d.errors.join(', '):'desconocido'))+'</span>';b.disabled=false;b.textContent='Buscar Productos';return}
+    var srcSum='';
+    if(d.sources_searched&&d.sources_searched.length){
+      srcSum=' <span style="font-size:11px;color:var(--t4)">(';
+      srcSum+=d.sources_searched.map(function(x){return x==='aliexpress'?'\ud83d\udfe0 AE':'\ud83d\udfe6 BG'}).join(' + ');
+      srcSum+=')</span>';
+    }
+    if(d.errors&&d.errors.length) srcSum+=' <span style="font-size:11px;color:var(--amber)">\u26a0 '+d.errors.join(', ')+'</span>';
+    s.innerHTML='<span class="ok">'+d.added+' productos encontrados'+(d.keywords?' para "'+d.keywords+'"':'')+srcSum+'</span>';
+    if(!d.products||!d.products.length){r.innerHTML='<div class="es"><div class="ei">\ud83d\udd0d</div>No se encontraron productos. Ajusta los filtros.</div>';b.disabled=false;b.textContent='Buscar Productos';return}
     r.innerHTML=d.products.map(function(p){
-      return '<div class="pc">'+
+      var isAe=p.source==='aliexpress';
+      var sc=isAe?'src-ae':'src-bg';
+      var bc=isAe?'bd-ae':'bd-bg';
+      var si=isAe?'\ud83d\udfe0':'\ud83d\udfe6';
+      return '<div class="pc '+sc+'">'+
         '<div class="pi">'+img(p.image_url)+'</div>'+
         '<div class="pn-wrap" style="flex:1;min-width:0">'+
           '<div class="pn"><a href="'+esc(p.url)+'" target="_blank">'+esc(p.title)+'</a></div>'+
-          '<div class="pm"><span class="bd bd-s">'+p.source+'</span><span class="bd bd-c">'+(p.category||'general')+'</span></div>'+
+          '<div class="pm"><span class="bd '+bc+'">'+si+' '+p.source+'</span><span class="bd bd-c">'+(p.category||'general')+'</span></div>'+
           '<div style="font-size:10px;color:var(--t4);font-family:JetBrains Mono,monospace">ID: '+p.product_id+'</div>'+
         '</div>'+
         '<div class="pv"><div class="price">$'+p.price_usd.toFixed(2)+'</div><div class="lbl">mayorista</div>'+
-        '<button class="btn btn-g" style="margin-top:6px;font-size:11px;padding:3px 8px" onclick="qcalc('+p.price_usd+',\''+(p.category||'default')+'\')">Calcular</button></div>'+
+        '<button class="btn btn-g" style="margin-top:6px;font-size:11px;padding:3px 8px" onclick="qcalc('+p.price_usd+',\\\''+(p.category||'default')+'\\\')">Calcular</button></div>'+
       '</div>';
     }).join('');
   }catch(e){s.innerHTML='<span class="err">Error: '+e.message+'</span>'}
@@ -260,11 +292,15 @@ async function loadProds(){
     var r=await fetch(A+'/products?limit=80');var prods=await r.json();
     if(!prods.length){p.innerHTML='<h1>Productos</h1><p class="st">Pipeline de productos encontrados</p><div class="es"><div class="ei">📦</div>No hay productos. Usa el Hunter.</div>';return}
     p.innerHTML='<h1>Productos</h1><p class="st">'+prods.length+' productos en pipeline</p>'+prods.map(function(x){
-      return '<div class="pc">'+
+      var isAe=(x.source||'').indexOf('aliexpress')>=0;
+      var srcClass=isAe?'src-ae':'src-bg';
+      var bdClass=isAe?'bd-ae':'bd-bg';
+      var srcIcon=isAe?'🟠':'🟦';
+      return '<div class="pc '+srcClass+'">'+
         '<div class="pi">'+img(x.image_url)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="pn">'+esc(x.name||'Sin nombre')+'</div>'+
-          '<div class="pm"><span class="bd bd-s">'+(x.source||'?')+'</span><span class="bd bd-c">'+(x.category||'general')+'</span><span style="font-size:10px;color:var(--t4)">'+(x.created_at||'')+'</span></div>'+
+          '<div class="pm"><span class="bd '+bdClass+'">'+srcIcon+' '+(x.source||'?')+'</span><span class="bd bd-c">'+(x.category||'general')+'</span><span style="font-size:10px;color:var(--t4)">'+(x.created_at||'')+'</span></div>'+
         '</div>'+
         '<div class="pv"><div class="price">$'+(x.product_cost_usd||0).toFixed(2)+'</div></div>'+
       '</div>';
